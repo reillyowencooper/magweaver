@@ -1,5 +1,5 @@
 import argparse
-from camag.camag.single_hmm_searcher import SearchSingleHMM
+from camag.single_hmm_searcher import SearchSingleHMM
 
 def parse_args():
     parser = argparse.ArgumentParser(description = "Search a directory of MAGs against a single profile HMM, construct an abundance table and a phylogenetic tree")
