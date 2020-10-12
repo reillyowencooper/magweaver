@@ -1,3 +1,5 @@
 # CAMAG
 
-CAMAG (Classify and Annotate Metagenome-Assembled Genomes) is a tool that classifies metagenome-assembled genomes as eukaryotic, prokaryotic, and viral, then annotates genes found within those genomes. 
+Work in progress tool for metagenome-assembled genomes.
+
+*NOTE: This is in the fledgling stages, with no workable parts yet - just the framework of a few classes.*
