@@ -1,11 +1,16 @@
-#!/usr/bin/env python3
-
 import subprocess, os, shutil, csv
 from Bio import SearchIO, SeqIO
 import pandas as pd
 
 class SearchSingleHMM(object):
-    '''Searches a suite of metagenome-assembled genomes to find an HMM of interest'''
+    '''Searches a suite of metagenome-assembled genomes (MAGs) to find an HMM of interest
+    mag_dir: Directory containing fasta files for each MAG to examine
+    output_dir: Directory to output all generated files (nested within mag_dir)
+    hmm: The profile HMM to search MAGs against
+    msa_option: Muscle or Clustal Omega, personal preference
+    phylo_option: RaxML or FastTree, personal preference
+    e-value: E-value cutoff for HMMsearch, will not keep hits that have a higher e-value than this
+    '''
     def __init__(self, mag_dir, output_dir, hmm, msa_option, phylo_option, evalue=1e-10):
         self.mag_dir = os.path.abspath(mag_dir)
         self.output_dir = output_dir
@@ -18,18 +23,23 @@ class SearchSingleHMM(object):
         self.hmm_list = []
         
     def get_mags(self):
+        '''Gets a list of MAGs from mag_dir
+        '''
         for mag in os.listdir(self.mag_dir):
             if mag.endswith('.fa') or mag.endswith('.fna'):
                 mag_path = os.path.join(self.mag_dir, mag)
                 self.mag_list.append(mag_path)
             
     def create_output_folder(self):
+        '''Prepares output folder for file deposit
+        '''
         output_path = os.path.join(self.mag_dir, self.output_dir)
         if not os.path.exists(output_path):
             os.mkdir(output_path)
         self.output_dir = output_path
             
     def predict_cds(self):
+        '''Predicts coding sequences in each MAG using Prodigal'''
         for mag in self.mag_list:
             mag_name = os.path.splitext(mag)[0]
             output_path = os.path.join(self.output_dir, mag_name + ".faa")
@@ -39,6 +49,7 @@ class SearchSingleHMM(object):
             self.cds_list.append(output_path)
             
     def search_hmm(self):
+        '''Searches coding regions for given HMM using Hmmsearch'''
         for mag in self.cds_list:
             mag_name = os.path.splitext(mag)[0]
             output_path = os.path.join(self.output_dir, mag_name + ".tab")
@@ -48,6 +59,7 @@ class SearchSingleHMM(object):
             self.hmm_list.append(output_path)
             
     def parse_hmmoutput(self):
+        '''Parses HMM table output and creates dict of MAG:contig names'''
         hit_ids = {}
         for mag in self.hmm_list:
             mag_name = os.path.splitext(mag)[0]
@@ -63,6 +75,7 @@ class SearchSingleHMM(object):
         return hit_ids
     
     def extract_seqs(self, hit_ids):
+        '''Takes in dict of MAG:contig names, then writes a FASTA file with all genome FASTA hits and MAG-specific headers'''
         self.mag_alignment_path = os.path.join(self.mag_dir, 'hmm_mag_hits.fa')
         if not os.path.exists(self.mag_alignment_path):
             seqfile = open(self.mag_alignment_path, "x")
@@ -83,8 +96,8 @@ class SearchSingleHMM(object):
                             with open(self.mag_alignment_path, 'a') as output:
                                 output.write(">" + os.path.basename(mag) + "_" + seqrecord_id + "\n" + str(seqrecord_seq) + "\n")
                                 
-
     def align_seqs(self):
+        '''Aligns sequence file using either MUSCLE or Clustal Omega'''
         hmm_name = os.path.splitext(os.path.basename(self.hmm))[0]
         self.msa_path = os.path.join(self.mag_dir, hmm_name + '_msa.aln')
         if not os.path.exists(self.msa_path):
@@ -96,6 +109,7 @@ class SearchSingleHMM(object):
                 subprocess.run(clustal_cmd)
             
     def build_phylogeny(self):
+        '''Builds phylogenetic tree using RAxML or FastTree (and PhyML once I figure it out)'''
         hmm_name = os.path.splitext(os.path.basename(self.hmm))[0]
         self.phylogenetic_tree = os.path.join(self.mag_dir, hmm_name + "_tree.tree")
         if not os.path.exists(self.phylogenetic_tree):
@@ -110,8 +124,8 @@ class SearchSingleHMM(object):
                 fasttree_cmd = ['FastTree', '-out', self.phylogenetic_tree, self.msa_path]
                 subprocess.run(fasttree_cmd)
             
-    
     def create_hmm_abundance_csv(self):
+        '''Generates a table of MAG:HMM occurrence from Hmmsearch table'''
         mag_abundance_dict = {}
         abundance_df = pd.DataFrame()
         for hmmout in self.hmm_list:
@@ -132,8 +146,8 @@ class SearchSingleHMM(object):
             w = csv.writer(magout)
             w.writerows(mag_abundance_dict.items())
                  
-        
     def move_files_to_output(self):
+        '''Cleans up mag_dir and puts output files from each step in the correct place'''
         hmm_name = os.path.splitext(os.path.basename(self.hmm))[0]
         prodigal_dir = os.path.join(self.output_dir, "predicted_cds")
         hmm_dir = os.path.join(self.output_dir, "hmm_hits")
