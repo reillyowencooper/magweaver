@@ -20,7 +20,10 @@ class DatabaseDownloader:
                     "Pfam-A.hmm.gz": "ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz",
                     "Pfam-A.hmm.dat.gz": "ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.dat.gz",
                     "NCBIfam-AMRFinder.HMM.tar.gz": "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/latest/NCBIfam-AMRFinder.HMM.tar.gz",
-                    "vog.hmm.tar.gz": "http://fileshare.csb.univie.ac.at/vog/latest/vog.hmm.tar.gz"}
+                    "vog.hmm.tar.gz": "http://fileshare.csb.univie.ac.at/vog/latest/vog.hmm.tar.gz",
+                    "bacteria_odb10.2019-06-26.tar.gz": "https://busco-data.ezlab.org/v4/data/lineages/bacteria_odb10.2019-06-26.tar.gz",
+                    "archaea_odb10.2019-01-04.tar.gz": "https://busco-data.ezlab.org/v4/data/lineages/archaea_odb10.2019-01-04.tar.gz",
+                    "eukaryota_odb10.2019-11-20.tar.gz": "https://busco-data.ezlab.org/v4/data/lineages/eukaryota_odb10.2019-11-20.tar.gz"}
 
     def check_if_downloaded(self):
         """Checks if all databases in self.dbs_to_dl have already been downloaded
@@ -145,6 +148,34 @@ class DatabaseDownloader:
                         with open(os.path.join(vog_profile_dir, filename), 'r') as hmm:
                             vog.write(hmm.read())
             self.remove_file(vog_profile_dir)
+
+    def unpack_busco_dbs(self):
+        '''Unzips Bacteria, Archaea, and Eukaryota BUSCO dbs and places them in a folder'''
+        print('Unpacking BUSCO databases')
+        busco_dir = os.path.join(self.output_dir, "busco_databases")
+        bac_loc = os.path.join(self.output_dir, "bacteria_odb10.2019-06-26.tar.gz")
+        arc_loc = os.path.join(self.output_dir, "archaea_odb10.2019-01-04.tar.gz")
+        euk_loc = os.path.join(self.output_dir, "eukaryota_odb10.2019-11-20.tar.gz")
+        if not os.path.exists(busco_dir):
+            os.mkdir(busco_dir)
+        bac_dir = os.path.join(busco_dir, "bacteria")
+        if not os.path.exists(bac_dir):
+            os.mkdir(bac_dir)
+            unpack_cmd = ['tar', '-xvzf', bac_loc, '-C', bac_dir]
+            subprocess.run(unpack_cmd)
+        arc_dir = os.path.join(busco_dir, "archaea")
+        if not os.path.exists(arc_dir):
+            os.mkdir(arc_dir)
+            unpack_cmd = ['tar', '-xvzf', arc_loc, '-C', arc_dir]
+            subprocess.run(unpack_cmd)
+        euk_dir = os.path.join(busco_dir, "eukaryota")
+        if not os.path.exists(euk_dir):
+            os.mkdir(euk_dir)
+            unpack_cmd = ['tar', '-xvzf', euk_loc, '-C', euk_dir]
+            subprocess.run(unpack_cmd)
+        self.remove_file(bac_loc)
+        self.remove_file(arc_loc)
+        self.remove_file(euk_loc)
 
     def download_and_unpack_databases(self):
         """Workhorse function that performs retrieval and unpacking steps for databases
