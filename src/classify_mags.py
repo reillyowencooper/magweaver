@@ -18,14 +18,6 @@ class MagClassifier(object):
             os.mkdir(output_path)
         self.output_dir = output_path
         
-    def run_cat(self):
-        '''Runs CAT/BAT on a set of input bins, then adds taxonomic identity to those classified bins'''
-        cat_cmd = ['CAT', 'bins', '-b', self.mag_dir, '-d', self.cat_db_dir, '-t', self.cat_db_tax, '-s', '.fa', '--I_know_what_Im_doing', '--top', 6]
-        subprocess.run(cat_cmd)
-        cat_names_cmd = ['CAT', 'add_names', '-i', "out.BAT.bin2classification.txt", '-o', 'cat_classification.tab', '-t', self.cat_db_tax]
-        subprocess.run(cat_names_cmd)
-        shutil.move('cat_classification.tab', os.path.join(self.output_dir, 'cat_classification.tab'))
-        
     def parse_cat_taxonomy(self):
         '''Parses the output CAT/BAT file to find taxonomic identity for each bin
         NOTE: Coded assuming the CAT file looks like it does in the docs - will check once database is downloaded

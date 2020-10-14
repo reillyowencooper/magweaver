@@ -1,4 +1,4 @@
-import os, subprocess, shutil, logging
+import os, subprocess, shutil, logging, csv
 import pandas as pd
 from Bio import SearchIO, SeqIO
 
@@ -115,30 +115,143 @@ class MagAnnotator(object):
                     if record.id not in contig_ids:
                         SeqIO.write([record], reduced, "fasta")
     
+    def combine_hmmtbls(self, list_of_hmmtbls, output_name):
+        lines_for_output = []
+        for hmmtbl in list_of_hmmtbls:
+            with open(hmmtbl, 'r') as tblout:
+                for line in tblout:
+                    if line.startswith('#'):
+                        continue
+                    else:
+                        line = line.split()
+                        line_fixed = line[:18] + [' '.join(line[18:])]
+                        lines_for_output.append(line_fixed)
+        with open(output_name, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerows(lines_for_output)
+                        
     def search_hmmdbs(self):
+        self.bac_unannot = []
+        self.arc_unannot = []
+        self.vir_unannot = []
+        self.bac_hmmannot = []
+        self.arc_hmmannot = []
+        self.vir_hmmannot = []
+        kofam_tmpfile = os.path.join(self.tmp_dir, "tmp_seqfile_kofam.faa")
+        pfam_tmpfile = os.path.join(self.tmp_dir, "tmp_seqfile_pfam.faa")
         for mag in self.bac_cds:
+            hmm_files = []
+            files_to_remove = []
             mag_name = os.path.splitext(os.path.basename(mag))[0]
             output_path = os.path.join(self.tmp_dir, mag_name + '_kofam.tab')
+            hmm_files.append(output_path)
+            files_to_remove.append(output_path)
             self.run_hmmsearch(self.hmm_dbs["kofam"], mag, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
-            tmp_seqfile_kofam = os.path.join(self.tmp_dir, "tmp_seqfile_kofam.faa")
-            self.reduce_input_fasta(hit_contigs, mag, tmp_seqfile_kofam)
+            files_to_remove.append(kofam_tmpfile)
+            self.reduce_input_fasta(hit_contigs, mag, kofam_tmpfile)
             output_path = os.path.join(self.tmp_dir, mag_name + '_pfam.tab')
-            self.run_hmmsearch(self.hmm_dbs["pfam"], tmp_seqfile_kofam, output_path)
+            hmm_files.append(output_path)
+            files_to_remove.append(output_path)
+            self.run_hmmsearch(self.hmm_dbs["pfam"], kofam_tmpfile, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
-            tmp_seqfile_pfam = os.path.join(self.tmp_dir, "tmp_seqfile_pfam.faa")
-            self.reduce_input_fasta(hit_contigs, tmp_seqfile_kofam, tmp_seqfile_pfam)
+            files_to_remove.append(pfam_tmpfile)
+            self.reduce_input_fasta(hit_contigs, kofam_tmpfile, pfam_tmpfile)
             output_path = os.path.join(self.tmp_dir, mag_name + '_amr.tab')
-            self.run_hmmsearch(self.hmm_dbs["amrfinder"], tmp_seqfile_pfam, output_path)
+            hmm_files.append(output_path)
+            files_to_remove.append(output_path)
+            self.run_hmmsearch(self.hmm_dbs["amrfinder"], pfam_tmpfile, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             unannotated_seqfile = os.path.join(self.tmp_dir, mag_name + "_unannotated.faa")
-            self.reduce_input_fasta(hit_contigs, tmp_seqfile_pfam, unannotated_seqfile)
-            os.remove(tmp_seqfile_kofam)
-            os.remove(tmp_seqfile_pfam)
-            # TODO: Make dict of all HMM hits together to assign to sequence headers
-            # TODO: Now do this for archaea, viruses (need to use VOG)
-            
+            self.bac_unannot.append(unannotated_seqfile)
+            self.reduce_input_fasta(hit_contigs, pfam_tmpfile, unannotated_seqfile)
+            self.combine_hmmtbls(hmm_files, os.path.join(tmp_dir, mag_name + '_hmms.tab'))
+            self.bac_hmmannot.append(os.path.join(tmp_dir, mag_name + '_hmms.tab'))
+            for filename in files_to_remove:
+                os.remove(filename)
+        for mag in self.arc_cds:
+            hmm_files = []
+            files_to_remove = []
+            mag_name = os.path.splitext(os.path.basename(mag))[0]
+            output_path = os.path.join(self.tmp_dir)
+            hmm_files.append(output_path)
+            files_to_remove.append(output_path)
+            self.run_hmmsearch(self.hmm_dbs["kofam"], mag, output_path)
+            hit_contigs = self.parse_hmmtbl(output_path)
+            files_to_remove.append(kofam_tmpfile)
+            self.reduce_input_fasta(hit_contigs, mag, kofam_tmpfile)
+            output_path = os.path.join(self.tmp_dir, mag_name + '_pfam.tab')
+            hmm_files.append(output_path)
+            files_to_remove.append(output_path)
+            self.run_hmmsearch(self.hmm_dbs["pfam"], kofam_tmpfile, output_path)
+            hit_contigs = self.parse_hmmtbl(output_path)
+            files_to_remove.append(pfam_tmpfile)
+            self.reduce_input_fasta(hit_contigs, kofam_tmpfile, pfam_tmpfile)
+            output_path = os.path.join(self.tmp_dir, mag_name + '_amr.tab')
+            hmm_files.append(output_path)
+            files_to_remove.append(output_path)
+            self.run_hmmsearch(self.hmm_dbs["amrfinder"], pfam_tmpfile, output_path)
+            hit_contigs = self.parse_hmmtbl(output_path)
+            unannotated_seqfile = os.path.join(self.tmp_dir, mag_name + "_unannotated.faa")
+            self.arc_unannot.append(unannotated_seqfile)
+            self.reduce_input_fasta(hit_contigs, pfam_tmpfile, unannotated_seqfile)
+            self.combine_hmmtbls(hmm_files, os.path.join(tmp_dir, mag_name + '_hmms.tab'))
+            self.arc_hmmannot.append(os.path.join(tmp_dir, mag_name + '_hmms.tab'))
+            for filename in files_to_remove:
+                os.remove(filename)
+        for mag in self.vir_cds:
+            hmm_files = []
+            files_to_remove = []
+            mag_name = os.path.splitext(os.path.basename(mag))[0]
+            output_path = os.path.join(self.tmp_dir)
+            hmm_files.append(output_path)
+            files_to_remove.append(output_path)
+            self.run_hmmsearch(self.hmm_dbs["kofam"], mag, output_path)
+            hit_contigs = self.parse_hmmtbl(output_path)
+            files_to_remove.append(kofam_tmpfile)
+            self.reduce_input_fasta(hit_contigs, mag, kofam_tmpfile)
+            output_path = os.path.join(self.tmp_dir, mag_name + '_pfam.tab')
+            hmm_files.append(output_path)
+            files_to_remove.append(output_path)
+            self.run_hmmsearch(self.hmm_dbs["pfam"], kofam_tmpfile, output_path)
+            hit_contigs = self.parse_hmmtbl(output_path)
+            files_to_remove.append(pfam_tmpfile)
+            self.reduce_input_fasta(hit_contigs, kofam_tmpfile, pfam_tmpfile)
+            output_path = os.path.join(self.tmp_dir, mag_name + '_vog.tab')
+            hmm_files.append(output_path)
+            files_to_remove.append(output_path)
+            self.run_hmmsearch(self.hmm_dbs["vog"], pfam_tmpfile, output_path)
+            hit_contigs = self.parse_hmmtbl(output_path)
+            unannotated_seqfile = os.path.join(self.tmp_dir, mag_name + "_unannotated.faa")
+            self.vir_unannot.append(unannotated_seqfile)
+            self.reduce_input_fasta(hit_contigs, pfam_tmpfile, unannotated_seqfile)
+            self.combine_hmmtbls(hmm_files, os.path.join(tmp_dir, mag_name + '_hmms.tab'))
+            self.vir_hmmannot.append(os.path.join(tmp_dir, mag_name + '_hmms.tab'))
+            for filename in files_to_remove:
+                os.remove(filename)          
+            # TODO: Figure out how eukaryotes work (life tip, just in general)
     
+    def run_mmseqs(self, input_aa, list_to_append_output):
+        mag_name = os.path.splitext(os.path.basename(input_aa))[0]
+        output_path = os.path.join(self.tmp_dir, mag_name + '.db')
+        create_mmseqs_db_cmd = ['mmseqs', 'createdb', input_aa, output_path]
+        list_to_append_output.append(output_path)
+        subprocess.run(create_mmseqs_db_cmd)
+        
+    def convert_aa_to_mmseqs(self):
+        self.bac_mmseqs = []
+        self.arc_mmseqs = []
+        self.vir_mmseqs = []
+        for mag in self.bac_unannot:
+            self.run_mmseqs(mag, self.bac_mmseqs)
+        for mag in self.arc_unannot:
+            self.run_mmseqs(mag, self.arc_mmseqs)
+        for mag in self.vir_mmseqs:
+            self.run_mmseqs(mag, self.vir_mmseqs)
+            
+    def run_mmseq_search(self, input_db):
+        # Run MMseqs on each unannotated MAG
+        pass
     
     def workhorse(self):
         self.create_logger()
