@@ -31,14 +31,17 @@ class MagClassifier(object):
         NOTE: Coded assuming the CAT file looks like it does in the docs - will check once database is downloaded
         '''
         cat_tax_filepath = os.path.join(self.output_dir, 'cat_classification.tab')
-        cat_tax = pd.from_csv(cat_tax_filepath, sep = "\t")
         bin_identity_dict = {}
-        for index, row in cat_tax.iterrows():
-            if row['lineage'] is NaN:
-                bin_identity_dict[row['bin']] = 'Unidentified'
-            else:
-                kingdom = row['classification'].split(';')[0]
-                bin_identity_dict[row['bin']] = kingdom
+        bin_list = []
+        with open(cat_tax_filepath, 'r') as classification:
+            for line in classification:
+                if not line.startswith('#'):
+                    line = line.split()
+                    bin_list.append(line)
+        for bin in bin_list:
+            mag_name = str(bin[0])
+            kingdom = str(bin[17])
+            bin_identity_dict[mag_name] = kingdom
         return bin_identity_dict
     
     def place_bins_in_tax_folders(self, bin_identity_dict):
@@ -51,7 +54,7 @@ class MagClassifier(object):
                 os.mkdir(bindir)
         for mag_name, identity in bin_identity_dict.items():
             for mag in os.listdir(self.mag_dir):
-                mag_name_indir = os.path.splitext(os.path.basename(mag))[0]
+                mag_name_indir = os.path.basename(mag)
                 if mag_name == mag_name_indir:
                     if identity == "Bacteria":
                         shutil.move(os.path.join(self.mag_dir, mag), os.path.join(bac_bins_dir, mag))
@@ -61,13 +64,16 @@ class MagClassifier(object):
                         shutil.move(os.path.join(self.mag_dir, mag), os.path.join(euk_bins_dir, mag))
                     else:
                         continue
+    
+    #def remove_cat_outputs(self):
+        # Remove the extra files that CAT/BAT generates, no need to have them around
         
     #def classify_remaining_bins(self):
         # Attempt to clasify remaining bins not classified by CAT/BAT, not sure how to do this yet or if needed
         
     def workhorse(self):
         '''Workhorse function that performs folder and file handling, CAT/BAT running and parsing
-        NOTE: Will eventually include processing of unclassified bins
+        NOTE: Will eventually include processing of unclassified bins and viruses
         '''
         self.create_output_folder()
         self.run_cat()

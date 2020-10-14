@@ -27,7 +27,7 @@ class SearchSingleHMM(object):
         self.logger = logging.getLogger(__file__)
         self.logger.setLevel(logging.INFO)
         fh = logging.FileHandler('single_hmm_search.log')
-        fh.setLevel(logging.info)
+        fh.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(message)s')
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
@@ -137,7 +137,7 @@ class SearchSingleHMM(object):
                 raxml_cmd = ['raxmlHPC', '-f', 'a', '-p', 99999, '-m', 'PROTGAMMAAUTO', '-x', 99999, '-N', 100, '-s', self.msa_path, '-n', self.phylogenetic_tree]
                 subprocess.run(raxml_cmd)
             elif self.phylo_option == "fasttree":
-                self.logger.info('Generating phylogeney with FastTree')
+                self.logger.info('Generating phylogeny with FastTree')
                 fasttree_cmd = ['FastTree', '-out', self.phylogenetic_tree, self.msa_path]
                 subprocess.run(fasttree_cmd)
             

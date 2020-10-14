@@ -16,7 +16,7 @@ class Annotator(object):
     def __init__(self, mag_dir, output_dir, database_dir, e_value, mag_type):
         self.mag_dir = os.path.abspath(mag_dir)
         self.output_dir = os.path.abspath(output_dir)
-        self.database_dir = os.path.abspath(self.database_dir)
+        self.database_dir = os.path.abspath(database_dir)
         self.e_value = e_value
         self.mag_type = mag_type
         self.hmm_dbs = {"kofam": os.path.join(self.database_dir, "kofam.hmm"),
@@ -31,7 +31,7 @@ class Annotator(object):
         self.logger = logging.getLogger(__file__)
         self.logger.setLevel(logging.INFO)
         fh = logging.FileHandler('single_hmm_search.log')
-        fh.setLevel(logging.info)
+        fh.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(message)s')
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
