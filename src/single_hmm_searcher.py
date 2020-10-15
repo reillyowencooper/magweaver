@@ -1,6 +1,7 @@
 import subprocess, os, shutil, csv, logging
 from Bio import SearchIO, SeqIO
 import pandas as pd
+import src.camag_utilities as utils
 
 
 class SearchSingleHMM(object):
@@ -43,10 +44,7 @@ class SearchSingleHMM(object):
     def create_output_folder(self):
         '''Prepares output folder for file deposit
         '''
-        output_path = os.path.join(self.mag_dir, self.output_dir)
-        if not os.path.exists(output_path):
-            os.mkdir(output_path)
-        self.output_dir = output_path
+        utils.create_dir(self.output_dir)
             
     def predict_cds(self):
         '''Predicts coding sequences in each MAG using Prodigal'''
@@ -65,9 +63,7 @@ class SearchSingleHMM(object):
             mag_name = os.path.splitext(mag)[0]
             self.logger.info('Searching ' + mag_name + ' for HMM')
             output_path = os.path.join(self.output_dir, mag_name + ".tab")
-            hmmsearch_cmd = ['hmmsearch', '-E', self.evalue, '--tblout', output_path, self.hmm, mag]
-            if not os.path.exists(mag_name + ".tab"):
-                subprocess.run(hmmsearch_cmd)
+            utils.run_hmmsearch(mag, self.evalue, output_path, self.hmm)
             self.hmm_list.append(output_path)
             
     def parse_hmmoutput(self):

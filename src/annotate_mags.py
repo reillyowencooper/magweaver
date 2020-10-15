@@ -1,6 +1,8 @@
 import os, subprocess, shutil, logging, csv
+import src.camag_utilities as utils
 import pandas as pd
 from Bio import SearchIO, SeqIO
+
 
 
 class MagAnnotator(object):
@@ -31,11 +33,9 @@ class MagAnnotator(object):
         self.logger.addHandler(fh)
           
     def prepare_output_dirs(self):
-        if not os.path.exists(self.output_dir):
-            os.mkdir(self.output_dir)
+        utils.create_dir(self.output_dir)
         self.tmp_dir = os.path.join(self.output_dir, "tmp")
-        if not os.path.exists(self.tmp_dir):
-            os.mkdir(self.tmp_dir)
+        utils.create_dir(self.tmp_dir)
             
     def get_mags(self):
         self.bac_list = []
@@ -86,11 +86,6 @@ class MagAnnotator(object):
             output_path = os.path.join(self.tmp_dir, mag_name + ".faa")
             metaeuk_cmd = ['metaeuk', 'easy-predict', mag, self.dbs['uniref'], mag_name, self.output_dir]            subprocess.run(prodigal_cmd)
             self.euk_cds.append(output_path)
-            
-    def run_hmmsearch(self, hmm_db, input_cd, output_path):
-        hmmsearch_cmd = ['hmmsearch', '-E', str(self.e_value),
-                         '--tblout', output_path, hmm_db, input_cd]
-        subprocess.run(hmmsearch_cmd)
     
     def parse_hmmtbl(self, hmmtbl):
         contig_ids = []
@@ -146,21 +141,21 @@ class MagAnnotator(object):
             output_path = os.path.join(self.tmp_dir, mag_name + '_kofam.tab')
             hmm_files.append(output_path)
             files_to_remove.append(output_path)
-            self.run_hmmsearch(self.hmm_dbs["kofam"], mag, output_path)
+            utils.run_hmmsearch(self.hmm_dbs["kofam"], mag, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             files_to_remove.append(kofam_tmpfile)
             self.reduce_input_fasta(hit_contigs, mag, kofam_tmpfile)
             output_path = os.path.join(self.tmp_dir, mag_name + '_pfam.tab')
             hmm_files.append(output_path)
             files_to_remove.append(output_path)
-            self.run_hmmsearch(self.hmm_dbs["pfam"], kofam_tmpfile, output_path)
+            utils.run_hmmsearch(self.hmm_dbs["pfam"], kofam_tmpfile, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             files_to_remove.append(pfam_tmpfile)
             self.reduce_input_fasta(hit_contigs, kofam_tmpfile, pfam_tmpfile)
             output_path = os.path.join(self.tmp_dir, mag_name + '_amr.tab')
             hmm_files.append(output_path)
             files_to_remove.append(output_path)
-            self.run_hmmsearch(self.hmm_dbs["amrfinder"], pfam_tmpfile, output_path)
+            utils.run_hmmsearch(self.hmm_dbs["amrfinder"], pfam_tmpfile, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             unannotated_seqfile = os.path.join(self.tmp_dir, mag_name + "_unannotated.faa")
             self.bac_unannot.append(unannotated_seqfile)
@@ -176,21 +171,21 @@ class MagAnnotator(object):
             output_path = os.path.join(self.tmp_dir)
             hmm_files.append(output_path)
             files_to_remove.append(output_path)
-            self.run_hmmsearch(self.hmm_dbs["kofam"], mag, output_path)
+            utils.run_hmmsearch(self.hmm_dbs["kofam"], mag, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             files_to_remove.append(kofam_tmpfile)
             self.reduce_input_fasta(hit_contigs, mag, kofam_tmpfile)
             output_path = os.path.join(self.tmp_dir, mag_name + '_pfam.tab')
             hmm_files.append(output_path)
             files_to_remove.append(output_path)
-            self.run_hmmsearch(self.hmm_dbs["pfam"], kofam_tmpfile, output_path)
+            utils.run_hmmsearch(self.hmm_dbs["pfam"], kofam_tmpfile, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             files_to_remove.append(pfam_tmpfile)
             self.reduce_input_fasta(hit_contigs, kofam_tmpfile, pfam_tmpfile)
             output_path = os.path.join(self.tmp_dir, mag_name + '_amr.tab')
             hmm_files.append(output_path)
             files_to_remove.append(output_path)
-            self.run_hmmsearch(self.hmm_dbs["amrfinder"], pfam_tmpfile, output_path)
+            utils.run_hmmsearch(self.hmm_dbs["amrfinder"], pfam_tmpfile, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             unannotated_seqfile = os.path.join(self.tmp_dir, mag_name + "_unannotated.faa")
             self.arc_unannot.append(unannotated_seqfile)
@@ -206,21 +201,21 @@ class MagAnnotator(object):
             output_path = os.path.join(self.tmp_dir)
             hmm_files.append(output_path)
             files_to_remove.append(output_path)
-            self.run_hmmsearch(self.hmm_dbs["kofam"], mag, output_path)
+            utils.run_hmmsearch(self.hmm_dbs["kofam"], mag, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             files_to_remove.append(kofam_tmpfile)
             self.reduce_input_fasta(hit_contigs, mag, kofam_tmpfile)
             output_path = os.path.join(self.tmp_dir, mag_name + '_pfam.tab')
             hmm_files.append(output_path)
             files_to_remove.append(output_path)
-            self.run_hmmsearch(self.hmm_dbs["pfam"], kofam_tmpfile, output_path)
+            utils.run_hmmsearch(self.hmm_dbs["pfam"], kofam_tmpfile, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             files_to_remove.append(pfam_tmpfile)
             self.reduce_input_fasta(hit_contigs, kofam_tmpfile, pfam_tmpfile)
             output_path = os.path.join(self.tmp_dir, mag_name + '_vog.tab')
             hmm_files.append(output_path)
             files_to_remove.append(output_path)
-            self.run_hmmsearch(self.hmm_dbs["vog"], pfam_tmpfile, output_path)
+            utils.run_hmmsearch(self.hmm_dbs["vog"], pfam_tmpfile, output_path)
             hit_contigs = self.parse_hmmtbl(output_path)
             unannotated_seqfile = os.path.join(self.tmp_dir, mag_name + "_unannotated.faa")
             self.vir_unannot.append(unannotated_seqfile)

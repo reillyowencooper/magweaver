@@ -1,6 +1,7 @@
 import os, subprocess, logging, shutil
 import pandas as pd
 from Bio import SeqIO, SearchIO
+import src.camag_utilities as utils
 
 # Sequentially search genome against databases in the following order:
 # 1: Kofam
@@ -52,8 +53,7 @@ class Annotator(object):
         self.euk_output = os.path.join(self.output_dir, "eukaryota_bin_annotation")
         self.vir_output = os.path.join(self.output_dir, "virus_bin_annotation")
         for annotype in [self.bac_output, self.arc_output, self.euk_output, self.vir_output]:
-            if not os.path.exists(annotype):
-                os.mkdir(annotype)
+            utils.create_output_dir(annotype)
             
     def predict_cds(self):
         for mag in self.mag_list:
