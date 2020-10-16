@@ -47,7 +47,7 @@ class CompletenessChecker(object):
     #            mag_path = os.path.join(self.mag_dir, mag)
     #            shutil.copyfile(mag_path, os.path.join(self.output_dir, mag))        
     
-    def count_contigs(self, mag):
+    def count_contigs(self):
         contig_count_dict = {}
         for mag in os.listdir(self.mag_dir):
             mag_path = os.path.join(self.mag_dir, mag)

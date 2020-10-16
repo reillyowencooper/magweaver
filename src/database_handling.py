@@ -3,6 +3,7 @@ import subprocess
 import gzip
 import shutil
 
+# TODO: Completely rework this, it's ugly and doesn't work
 class DatabaseDownloader:
     """Acts as a handler for HMM and sequence databases to search FASTAs against.
     """
@@ -14,7 +15,7 @@ class DatabaseDownloader:
         """
         self.output_dir = output_dir
         self.remove_zips = remove_zips
-        self.dbs_to_dl = {"uniref50.fasta.gz": "ftp://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz",
+        self.dbs_to_dl = {
                     "profiles.tar.gz": "ftp://ftp.genome.jp/pub/db/kofam/profiles.tar.gz",
                     "ko_list.gz": "ftp://ftp.genome.jp/pub/db/kofam/ko_list.gz",
                     "Pfam-A.hmm.gz": "ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz",
@@ -51,16 +52,20 @@ class DatabaseDownloader:
         if self.remove_zips:
             os.remove(file_loc)
 
-    def convert_uniref_to_mmseqs(self):
-        """Converts UniRef50 database to MMSeqs2 db
+    def retrieve_swissprot_mmseqs(self):
+        """Getting NT MMSeqs2 db
         """
-        print('Converting UniRef50 to MMSeqs2 db')
-        uniref_mmseqs_loc = os.path.join(self.output_dir, "uniref_mmseqs.db")
+        print('Getting NT MMSeqs2 db')
+        uniref_mmseqs_loc = os.path.join(self.output_dir, "uniref_mmseqs")
         if not os.path.exists(uniref_mmseqs_loc):
-            uniref_full_loc = os.path.join(self.output_dir, "uniref50.fasta.gz")
-            createdb_cmd = ['mmseqs', 'createdb', uniref_full_loc, uniref_mmseqs_loc]
-            subprocess.run(createdb_cmd)
-            self.remove_file(uniref_full_loc)
+            os.mkdir(uniref_mmseqs_loc)
+            getdb_cmd = ['mmseqs', 'databases', 'NT', os.path.join(uniref_mmseqs_loc, 'nt'), os.path.join(self.output_dir, "tmp")]
+            subprocess.run(getdb_cmd)
+            gettaxdb_cmd = ['mmseqs', 'createtaxdb', os.path.join(uniref_mmseqs_loc, 'nt'), os.path.join(self.output_dir, "tmp")]
+            subprocess.run(gettaxdb_cmd)
+            index_cmd = ['mmseqs', 'createindex', os.path.join(uniref_mmseqs_loc, 'nt'), os.path.join(self.output_dir, "tmp")]
+            subprocess.run(index_cmd)
+            
 
     def unpack_kofam_db(self):
         """Unzips the KOfam HMM tarball and writes individual HMMs to master HMM file
@@ -168,4 +173,4 @@ class DatabaseDownloader:
         self.unpack_amrfinder_db()
         self.unpack_vog_db()
         self.unpack_cat_db()
-        self.convert_uniref_to_mmseqs()
+        self.retrieve_swissprot_mmseqs()
