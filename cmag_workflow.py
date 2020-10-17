@@ -36,6 +36,9 @@ def prep_nt(database_dir):
     databaseHandler = DatabaseDownloader(database_dir)
     databaseHandler.retrieve_swissprot_mmseqs()
     
+def identify_contamination(cov, gc, tetra, tax):
+    pass # Extract contigs that have erroneous profile
+    
 def main():
     args = parse_args()
     prep_nt("databases")
@@ -76,11 +79,14 @@ def main():
         swissprot_db = os.path.join()
         mag_tax = MagTaxonomy(os.path.join(args.output_dir, filename),
                                args.output_dir,
-                               "databases/nt/")
+                               "databases/swissprot/swissprot")
         mag_tax.create_outputs()
+        mag_tax.predict_cds()
         mag_tax.create_mag_mmseqsdb()
         mag_tax.get_contig_taxonomy()
-        taxonomy = mag_tax.parse_taxonomy()
+        tax_df = mag_tax.parse_taxonomy()
+        phylum_tax = mag_tax.get_consensus_taxonomy(tax_df)
+        mag_tax.remove_mmseqs_files()
         # TODO: Write function that defines what a weird contig looks like
         weird_contigs = []
         

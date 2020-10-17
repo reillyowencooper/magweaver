@@ -1,9 +1,5 @@
-import os
-import subprocess
-import gzip
-import shutil
+import os, subprocess, gzip, shutil
 
-# TODO: Completely rework this, it's ugly and doesn't work
 class DatabaseDownloader:
     """Acts as a handler for HMM and sequence databases to search FASTAs against.
     """
@@ -21,8 +17,8 @@ class DatabaseDownloader:
                     "Pfam-A.hmm.gz": "ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.gz",
                     "Pfam-A.hmm.dat.gz": "ftp://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/Pfam-A.hmm.dat.gz",
                     "NCBIfam-AMRFinder.HMM.tar.gz": "https://ftp.ncbi.nlm.nih.gov/hmm/NCBIfam-AMRFinder/latest/NCBIfam-AMRFinder.HMM.tar.gz",
-                    "vog.hmm.tar.gz": "http://fileshare.csb.univie.ac.at/vog/latest/vog.hmm.tar.gz",
-                    "CAT_prepare_20200618.tar.gz": "tbb.bio.uu.nl/bastiaan/CAT_prepare/CAT_prepare_20200618.tar.gz"}
+                    "vog.hmm.tar.gz": "http://fileshare.csb.univie.ac.at/vog/latest/vog.hmm.tar.gz"
+                    }
 
     def check_if_downloaded(self):
         """Checks if all databases in self.dbs_to_dl have already been downloaded
@@ -56,17 +52,16 @@ class DatabaseDownloader:
         """Getting NT MMSeqs2 db
         """
         print('Getting NT MMSeqs2 db')
-        uniref_mmseqs_loc = os.path.join(self.output_dir, "uniref_mmseqs")
+        uniref_mmseqs_loc = os.path.join(self.output_dir, "swissprot")
         if not os.path.exists(uniref_mmseqs_loc):
             os.mkdir(uniref_mmseqs_loc)
-            getdb_cmd = ['mmseqs', 'databases', 'NT', os.path.join(uniref_mmseqs_loc, 'nt'), os.path.join(self.output_dir, "tmp")]
+            getdb_cmd = ['mmseqs', 'databases', 'NT', os.path.join(uniref_mmseqs_loc, 'swissprot'), os.path.join(self.output_dir, "tmp")]
             subprocess.run(getdb_cmd)
-            gettaxdb_cmd = ['mmseqs', 'createtaxdb', os.path.join(uniref_mmseqs_loc, 'nt'), os.path.join(self.output_dir, "tmp")]
+            gettaxdb_cmd = ['mmseqs', 'createtaxdb', os.path.join(uniref_mmseqs_loc, 'swissprot'), os.path.join(self.output_dir, "tmp")]
             subprocess.run(gettaxdb_cmd)
-            index_cmd = ['mmseqs', 'createindex', os.path.join(uniref_mmseqs_loc, 'nt'), os.path.join(self.output_dir, "tmp")]
+            index_cmd = ['mmseqs', 'createindex', os.path.join(uniref_mmseqs_loc, 'swissprot'), os.path.join(self.output_dir, "tmp")]
             subprocess.run(index_cmd)
             
-
     def unpack_kofam_db(self):
         """Unzips the KOfam HMM tarball and writes individual HMMs to master HMM file
         """
@@ -152,17 +147,6 @@ class DatabaseDownloader:
                             vog.write(hmm.read())
             self.remove_file(vog_profile_dir)
 
-    def unpack_cat_db(self):
-        '''Unzips CAT/BAT database and places it in a folder'''
-        print('Unpacking CAT/BAT database')
-        cat_loc = os.path.join(self.output_dir, "CAT_prepare_20200618.tar.gz")
-        cat_dir = os.path.join(self.output_dir, "cat_db")
-        if not os.path.exists(cat_dir):
-            os.mkdir(cat_dir)
-            unpack_cmd = ['tar', '-xvzf', cat_loc, '-C', cat_dir]
-            subprocess.run(unpack_cmd)
-        self.remove_file(cat_loc)
-
     def download_and_unpack_databases(self):
         """Workhorse function that performs retrieval and unpacking steps for databases
         """
@@ -172,5 +156,4 @@ class DatabaseDownloader:
         self.unpack_pfam_db()
         self.unpack_amrfinder_db()
         self.unpack_vog_db()
-        self.unpack_cat_db()
         self.retrieve_swissprot_mmseqs()

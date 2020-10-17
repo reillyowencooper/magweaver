@@ -52,9 +52,8 @@ class SearchSingleHMM(object):
             mag_name = os.path.splitext(mag)[0]
             self.logger.info('Predicting coding regions for ' + mag_name)
             output_path = os.path.join(self.output_dir, mag_name + ".faa")
-            prodigal_cmd = ['prodigal', '-i', mag, '-a', output_path, '-p', 'meta', '-q']
-            if not os.path.exists(mag_name + ".faa"):
-                subprocess.run(prodigal_cmd)
+            if not os.path.exists(output_path):
+                utils.predict_cds(mag, output_path)
             self.cds_list.append(output_path)
             
     def search_hmm(self):

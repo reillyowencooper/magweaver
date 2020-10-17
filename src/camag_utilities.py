@@ -10,3 +10,8 @@ def run_hmmsearch(aa_file, e_value, output_path, hmm):
     hmmsearch_cmd = ['hmmsearch', '-E', e_value, '--tblout', output_path, hmm, aa_file]
     if not os.path.exists(output_path):
         subprocess.run(hmmsearch_cmd)
+        
+def predict_cds(mag, output_path):
+    '''Runs Prodigal on an input MAG'''
+    prodigal_cmd = ['prodigal', '-i', mag, '-a', output_path, '-p', 'meta', '-q']
+    subprocess.run(prodigal_cmd)
