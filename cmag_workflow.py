@@ -30,18 +30,26 @@ def place_hiqual_bins(mag_dir, checkm_df, completeness, contamination, output_di
                 if os.path.basename(mag) == bin_id:
                     shutil.copyfile(os.path.join(mag_dir, mag), os.path.join(output_dir, mag))
     
-def prep_nt(database_dir):
+def prep_swissprot(database_dir):
     if not os.path.exists(database_dir):
         os.mkdir(database_dir)
     databaseHandler = DatabaseDownloader(database_dir)
     databaseHandler.retrieve_swissprot_mmseqs()
     
-def identify_contamination(cov, gc, tetra, tax):
+def identify_contamination(cov_df, gc_df, tetra_df, tax_df,
+                           cov_mean, cov_std,
+                           gc_mean, gc_std):
+    contig_names = cov_df['Contig'].tolist()
+    err_cov_df = cov_df[(cov_df['Mean Coverage'] > cov_mean + cov_std) or 
+                     (cov_df['Mean Coverage'] < cov_mean - cov_std)]
+    err_gc_df = gc_df[(gc_df['GC Content'] > gc_mean + gc_std) or
+                      (gc_df['GC Content'] < gc_mean - gc_std)] 
+        
     pass # Extract contigs that have erroneous profile
     
 def main():
     args = parse_args()
-    prep_nt("databases")
+    prep_swissprot("databases")
     completor = CompletenessChecker(args.mag_dir,
                                     args.output_dir,
                                     args.completeness,
@@ -56,6 +64,7 @@ def main():
                       args.completeness,
                       args.contamination,
                       args.output_dir)
+    # Work only on high quality bins
     for filename in os.listdir(args.output_dir):
         aligned = MagAligner(os.path.join(args.output_dir, filename),
                              args.forward,
