@@ -9,4 +9,5 @@ def cli():
                                        help = "Identify contig-level taxonomy within a MAG",
                                        )
     tax.fetch_args(tax_parser)
-                                            
+    args = vars(parser.parse_args())
+    args["func"](args)
