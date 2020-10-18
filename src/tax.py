@@ -1,7 +1,6 @@
 import os, subprocess, shutil, argparse
 import pandas as pd
 from collections import Counter
-import src.utilities as utils
 
 def parse_args():
     parser = argparse.ArgumentParser(description = 'Classify taxonomy of contigs within a MAG')
@@ -14,7 +13,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    utils.create_dir(args.tmp_dir)
+    if not os.path.exists(args.tmp_dir):
+        os.mkdir(args.tmp_dir)
     magtax = MagTaxonomy(args.output_dir)
     magtax.run(args.input_mag,
                args.search_db,
