@@ -1,22 +1,6 @@
 import os, subprocess, shutil, argparse
 import pandas as pd
 from collections import Counter
-
-def fetch_args(parser):
-    parser.set_defaults(func=main)
-    parser.set_defaults(program = "contig-tax")
-    parser.add_argument('--input_mag', help = "Path to predicted CDS file for MAG")
-    parser.add_argument('--search_db', default = "databases/swissprot/swissprot", help = "Path to MMSeqs SwissProt DB")
-    parser.add_argument('--output_dir', help = "Directory to place output files")
-    parser.add_argument('--tmp_dir', default= "tmp", help = "Directory to store temporary files")
-
-def main(args):
-    if not os.path.exists(args["tmp_dir"]):
-        os.mkdir(args["tmp_dir"])
-    magtax = MagTaxonomy(args["output_dir"])
-    magtax.run(args["input_mag"],
-               args["search_db"],
-               args["tmp_dir"])
     
 
 class MagTaxonomy(object):
