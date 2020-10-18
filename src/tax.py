@@ -2,25 +2,21 @@ import os, subprocess, shutil, argparse
 import pandas as pd
 from collections import Counter
 
-def parse_args():
-    parser = argparse.ArgumentParser(description = 'Classify taxonomy of contigs within a MAG')
+def fetch_args(parser):
     parser.set_defaults(func = main)
     parser.set_defaults(program = "contig-tax")
     parser.add_argument('--input_mag', help = "Path to predicted CDS file for MAG")
     parser.add_argument('--search_db', default = "databases/swissprot/swissprot", help = "Path to MMSeqs SwissProt DB")
     parser.add_argument('--output_dir', help = "Directory to place output files")
     parser.add_argument('--tmp_dir', default= "tmp", help = "Directory to store temporary files")
-    args = parser.parse_args()
-    return args
 
-def main():
-    args = parse_args()
-    if not os.path.exists(args.tmp_dir):
-        os.mkdir(args.tmp_dir)
-    magtax = MagTaxonomy(args.output_dir)
-    magtax.run(args.input_mag,
-               args.search_db,
-               args.tmp_dir)
+def main(args):
+    if not os.path.exists(args["tmp_dir"]):
+        os.mkdir(args["tmp_dir"])
+    magtax = MagTaxonomy(args["output_dir"])
+    magtax.run(args["input_mag"],
+               args["search_db"],
+               args["tmp_dir"])
     
 
 class MagTaxonomy(object):
@@ -142,9 +138,11 @@ class MagTaxonomy(object):
         tax_tsv = os.path.join(tmp_dir, mag_name + "_taxonomy.tsv")
         contig_tax_outloc = os.path.join(self.output_dir, mag_name + "_taxonomy.tsv")
         erroneous_contig_outloc = os.path.join(self.output_dir, "suspicious_taxonomy.tsv")
+        print('Creating MMseqs2 database from MAG')
         self.create_mag_db(mag_aa,
                            mag_name,
                            tmp_dir)
+        print('Identifying contig taxonomy')
         self.get_contig_taxonomy(mag_db,
                                  mag_name,
                                  search_db,
