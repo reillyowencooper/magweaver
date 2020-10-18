@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-
 import argparse
 from src.tax import MagTaxonomy
+import src.utilities as utils
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Get contig-level taxonomy for a MAG')
@@ -16,12 +16,11 @@ def parse_args():
 
 def main():
     args = parse_args()
-    if not os.path.exists(args["tmp_dir"]):
-        os.mkdir(args["tmp_dir"])
-    magtax = MagTaxonomy(args["output_dir"])
-    magtax.run(args["input_mag"],
-               args["search_db"],
-               args["tmp_dir"])
+    utils.create_dir(args.tmp_dir)
+    magtax = MagTaxonomy(args.output_dir)
+    magtax.run(args.input_mag,
+               args.search_db,
+               args.tmp_dir)
     
 if __name__ == "__main__":
     main()
