@@ -4,6 +4,8 @@ from collections import Counter
 
 def parse_args():
     parser = argparse.ArgumentParser(description = 'Classify taxonomy of contigs within a MAG')
+    parser.set_defaults(func = main)
+    parser.set_defaults(program = "contig-tax")
     parser.add_argument('--input_mag', help = "Path to predicted CDS file for MAG")
     parser.add_argument('--search_db', default = "databases/swissprot/swissprot", help = "Path to MMSeqs SwissProt DB")
     parser.add_argument('--output_dir', help = "Directory to place output files")
