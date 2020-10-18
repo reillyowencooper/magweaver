@@ -46,7 +46,7 @@ class MagTaxonomy(object):
         output_file: str
             Path to output summarized taxonomic classifications
         '''
-        gettax_cmd = ['mmseqs', 'taxonomy', mag_db, search_db, magtax_db, tmp_dir, '--merge-query', 1, '--remove-tmp-files', '--tax-lineage', 1]
+        gettax_cmd = ['mmseqs', 'taxonomy', mag_db, search_db, magtax_db, tmp_dir, '--merge-query', "1", '--remove-tmp-files', '--tax-lineage', "1"]
         tsv_cmd = ['mmseqs', 'createtsv', mag_db, magtax_db, output_file]
         subprocess.run(gettax_cmd)
         subprocess.run(tsv_cmd)
@@ -135,6 +135,7 @@ class MagTaxonomy(object):
                                  tax_tsv)
         contig_taxonomy = self.parse_contig_taxonomy(tax_tsv)
         consensus_taxonomy = self.get_contig_consensus_tax(contig_taxonomy)
-        self.write_taxonomy_df(contig_tax_outloc)
-        self.write_taxonomy_df(erroneous_contig_outloc)
+        erroneous_taxonomy = self.identify_erroneous_contigs(consensus_taxonomy)
+        self.write_taxonomy_df(consensus_taxonomy, contig_tax_outloc)
+        self.write_taxonomy_df(erroneous_taxonomy, erroneous_contig_outloc)
         self.remove_tmp_files(tmp_dir)

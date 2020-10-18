@@ -1,5 +1,5 @@
 import argparse
-from src.completeness import CompletenessChecker
+from src.quality import QualityChecker
 
 def parse_args():
     parser = argparse.ArgumentParser(description = "Quantify completion and contamination of MAGs using CheckM")
@@ -9,22 +9,19 @@ def parse_args():
     required.add_argument('--output_dir', help = 'Directory to output summary')
     optional.add_argument('--completeness', help = 'Minimum completeness to qualify as High Quality, default 95')
     optional.add_argument('--contamination', help = 'Maximum contamination to qualify as High Quality, default 5')
+    optional.add_argument('--num_contigs', help = 'Maximum number of contigs to qualify as High Quality, default 10')
     args = parser.parse_args()
     return args
 
 
 def main():
     args = parse_args()
-    completor = CompletenessChecker(args.mag_dir,
-                                       args.output_dir,
-                                       args.completeness,
-                                       args.contamination)
-    completor.create_logger()
-    completor.create_output_dir()
-    completor.run_checkm()
-    contig_count = completor.count_contigs()
-    final_df = completor.summarize_completeness_contam(contig_count)
-    completor.df_to_csv(final_df)
+    completor = QualityChecker(args.mag_dir,
+                                    args.output_dir,
+                                    args.completeness,
+                                    args.contamination,
+                                    args.num_contigs)
+    completor.run()
 
 if __name__ == "__main__":
     main()
