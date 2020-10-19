@@ -65,20 +65,8 @@ class MagGC(object):
         gc = [gc for gc in gc_dict.values()]
         std = np.std(gc)
         return std
-    
-    def contig_diff(self, mean_gc, gc_dict):
-        '''Creates a dict of contig name: contig GC difference from weighted mean
-        mean_gc: float
-            Value for weighted GC mean across MAG
-        gc_dict: dict
-            Dictionary of contig name: contig GC content
-        '''
-        self.logger.info('Calculating deviation from weighted mean per contig')
-        diff_dict = {}
-        for contig, gc in gc_dict.items():
-            diff_dict[contig] = abs(mean_gc - gc)
             
-    def identify_erroneous_contigs(self, diff_dict, mean_gc, std_gc):
+    def identify_erroneous_contigs(self, gc_dict, mean_gc, std_gc):
         '''Examines each contig for GC signature outside of standard deviation
         diff_dict: dict
             Dictionary of contig name: contig GC difference from weighted mean
@@ -87,16 +75,16 @@ class MagGC(object):
         std_gc: float
             Value for standard deviation of GC across MAG
         Returns:
-            DataFrame of Contig, GC difference from weighted mean
+            DataFrame of Contig, GC content for erroneous contigs
         '''
         self.logger.info('Identifying contigs with GC content outside of standard deviation')
         erroneous_contigs = {}
         min_gc = mean_gc - std_gc
         max_gc = mean_gc + std_gc
-        for contig, gc_diff in diff_dict.items():
-            if (gc_diff > max_gc) or (gc_diff < min_gc):
-                erroneous_contigs[contig] = gc_diff
-        err_df = pd.DataFrame(list(erroneous_contigs.items()), columns = ['Contig', 'GC Diff'])
+        for contig, gc in gc_dict.items():
+            if (gc > max_gc) or (gc < min_gc):
+                erroneous_contigs[contig] = gc
+        err_df = pd.DataFrame(list(erroneous_contigs.items()), columns = ['Contig', 'GC Content'])
         return err_df
     
     def write_df(self, err_df, outfile):
@@ -106,12 +94,12 @@ class MagGC(object):
         
     def run(self):
         outfile_loc = os.path.join(self.outdir, os.path.splitext(mag)[0] + "_err_gc.csv")
+        self.create_logger()
         length_dict = self.retrieve_contig_len()
         gc_dict = self.retrieve_contig_gc()
         mean_gc = self.find_mean_gc(length_dict, gc_dict)
         std_gc = self.find_std_gc(gc_dict)
-        diff_dict = self.contig_diff(mean_gc, gc_dict)
-        err_df = self.identify_erroneous_contigs(diff_dict, mean_gc, std_gc)
+        err_df = self.identify_erroneous_contigs(gc_dict, mean_gc, std_gc)
         self.write_df(err_df, outfile_loc)
         
         
