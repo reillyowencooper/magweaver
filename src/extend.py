@@ -2,13 +2,13 @@ import os, subprocess, shutil, logging
 import pandas as pd
 import numpy as np
 import src.utilities as utils
-from Bio import SearchIO, SeqIO, SeqUtils
+from Bio import SearchIO, SeqIO, SeqUtils, Seq
 import pysam
 
 # TODO: Add logging
 
 class MagExtender(object):
-    '''Given a MAG and a set of forward/reverse reads, aligns reads and attempt to extend at ends of each contig'''
+    '''Given a MAG and a set of forward/reverse reads, aligns reads and attempt to extend at ends of each scaffold'''
     def __init__(self, mag, forward_reads, reverse_reads):
         self.mag = mag
         self.mag_name = os.path.splitext(os.path.basename(mag))[0]
@@ -23,11 +23,11 @@ class MagExtender(object):
     def split_mag(self):
         '''Splits MAG bin into individual contigs'''
         self.contig_fas = []
-        for seqrecord in SeqIO.parse(self.mag):
+        for seqrecord in SeqIO.parse(self.mag, "fasta"):
             seqid = seqrecord.id
             sequence = seqrecord.seq
             with open(os.path.join(self.tmp_dir, seqid), 'w') as cfile:
-                cfile.write('>' + str(id) + '\n' + str(sequence))
+                cfile.write('>' + str(seqid) + '\n' + str(sequence))
                 self.contig_fas.append(os.path.join(self.tmp_dir, seqid))
             
     def index_contig(self):
@@ -40,37 +40,16 @@ class MagExtender(object):
         samfile = os.path.join(self.tmp_dir, os.path.basename(contig_file) + ".sam")
         bwamem_cmd = ['bwa', 'mem', contig_file, self.forward_reads, self.reverse_reads]
         if not os.path.exists(samfile):
-            with open(samfile, "w'") as outfile:
+            with open(samfile, "w") as outfile:
                     subprocess.run(bwamem_cmd, stdout=outfile)
-                       
-    def extract_all_mapped(self, samfile):
-        sam_name = os.path.splitext(os.path.basename(samfile))[0]
-        # Reads with both mates mapping
-        both_outfile = os.path.join(self.tmp_dir, sam_name + "_both.bam")
-        both_sorted_outfile = os.path.join(self.tmp_dir, sam_name + "_both_sorted.bam")
-        pysam.view('-bS', '-f', '12', '-o', both_outfile, samfile, catch_stdout = False)
-        pysam.sort('-o', both_sorted_outfile, both_outfile)
-        # Reads with only forward mapping
-        read_only_outfile = os.path.join(self.tmp_dir, sam_name + "_read.bam")
-        read_sorted_outfile = os.path.join(self.tmp_dir, sam_name + "_read_sorted.bam")
-        pysam.view('-bS', '-f', '8', '-F', '4', '-o', read_only_outfile, samfile, catch_stdout = False)
-        pysam.sort('-o', read_sorted_outfile, read_only_outfile)
-        # Reads with only mate mapping
-        mate_only_outfile = os.path.join(self.tmp_dir, sam_name + "_mate.bam")
-        mate_sorted_outfile = os.path.join(self.tmp_dir, sam_name + "_mate_sorted.bam")
-        pysam.view('-bS','-f', '4', '-F', '8', '-o', read_only_outfile, samfile, catch_stdout = False)
-        pysam.sort('-o', mate_sorted_outfile, mate_only_outfile)  
-
-    def merge_bams(self, both, mate1, mate2):
-        merged_outfile = os.path.join(self.tmp_dir, self.mag_name + "_merged.bam")
-        pysam.merge(merged_outfile, both, mate1, mate2)
-            
-    def write_bam_to_fq(self, bam, outfile):
-        bedtools_cmd = ['bamToFastq', '-i', bam, '-fq', outfile + '_forward.fq', '-fq2', outfile + '_reverse.fq']
-        subprocess.run(bedtools_cmd)
-    
-    def assemble_reads(self, forward, reverse):
-        pass # TODO: Create contig assembly
+        bamfile = os.path.join(self.tmp_dir, os.path.basename(contig_file) + ".bam")
+        if not os.path.exists(bamfile):
+            pysam.view('-bS', '-o', bamfile, samfile, catch_stdout=False)
+        bamfile_sorted = os.path.join(self.tmp_dir, os.path.basename(contig_file) + "_sorted.bam")
+        pysam.sort('-o', bamfile_sorted, bamfile)
+        pysam.index(bamfile_sorted)
+        
+    # Working with BAM files and trying to turn into Fastq has to be the worst thing in the history of the universe maybe ever
 
         
     def write_files(self):
