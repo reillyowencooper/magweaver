@@ -1,98 +1,77 @@
 import os, subprocess, shutil, logging
 import pandas as pd
 import numpy as np
-import src.camag_utilities as utils
+import src.utilities as utils
 from Bio import SearchIO, SeqIO, SeqUtils
 import pysam
 
 # TODO: Add logging
 
-class MagAligner(object):
-    '''Given a MAG and a set of forward/reverse reads, aligns reads and generates stats'''
-    def __init__(self, mag, forward_reads, reverse_reads, keep_bam=False):
-        self.mag = os.path.abspath(mag)
+class MagExtender(object):
+    '''Given a MAG and a set of forward/reverse reads, aligns reads and attempt to extend at ends of each contig'''
+    def __init__(self, mag, forward_reads, reverse_reads):
+        self.mag = mag
         self.mag_name = os.path.splitext(os.path.basename(mag))[0]
-        self.forward_reads = os.path.abspath(forward_reads)
-        self.reverse_reads = os.path.abspath(reverse_reads)
+        self.forward_reads = forward_reads
+        self.reverse_reads = reverse_reads
         self.tmp_dir = os.path.join(os.path.dirname(self.mag), "tmp")
-        self.keep_bam = keep_bam
+        
         
     def make_tmp_dir(self):
         utils.create_dir(self.tmp_dir)
         
-    def index_mag(self):
-        index_cmd = ['bwa', 'index', self.mag]
-        subprocess.run(index_cmd)
-        
-    def align_reads(self):
-        self.sam_file = os.path.join(self.tmp_dir, self.mag_name + ".sam")
-        bwamem_cmd = ['bwa', 'mem', self.mag, self.forward_reads, self.reverse_reads]
-        if not os.path.exists(self.sam_file):
-            with open(self.sam_file, "w") as outfile:
-                subprocess.run(bwamem_cmd, stdout=outfile)
+    def split_mag(self):
+        '''Splits MAG bin into individual contigs'''
+        self.contig_fas = []
+        for seqrecord in SeqIO.parse(self.mag):
+            seqid = seqrecord.id
+            sequence = seqrecord.seq
+            with open(os.path.join(self.tmp_dir, seqid), 'w') as cfile:
+                cfile.write('>' + str(id) + '\n' + str(sequence))
+                self.contig_fas.append(os.path.join(self.tmp_dir, seqid))
             
-    def sam_to_bam(self):
-        self.bam_file = os.path.join(self.tmp_dir, self.mag_name + ".bam")
-        if not os.path.exists(self.bam_file):
-            pysam.view("-bS", "-o", self.bam_file, self.sam_file, catch_stdout = False)
-    
-    def sort_bam(self):
-        self.sorted_bam = os.path.join(self.tmp_dir, self.mag_name + "_sorted.bam")
-        if not os.path.exists(self.sorted_bam):
-            pysam.sort("-o", self.sorted_bam, self.bam_file)
-            
-    def get_num_contigs(self):
-        contig_headers = []
-        for seqrecord in SeqIO.parse(self.mag, "fasta"):
-            contig_headers.append(seqrecord.id)
-        num_contigs = len(contig_headers)
-        return num_contigs
+    def index_contig(self):
+        '''Indexes each contig separately using BWA'''
+        for cfile in self.contig_fas:
+            index_cmd = ['bwa', 'index', cfile]
+            subprocess.run(index_cmd)    
         
-    def get_contig_gc(self):
-        contig_gc = {}
-        for seqrecord in SeqIO.parse(self.mag, "fasta"):
-            contig_name = seqrecord.id
-            contig_gc_content = SeqUtils.GC(seqrecord.seq)
-            contig_gc[contig_name] = contig_gc_content
-        gc_df = pd.DataFrame(list(contig_gc.items()), columns = ['Contig', 'GC Content'])
-        return gc_df
-        
-    def get_contig_coverage_depth(self):
-        depth = pysam.depth(self.sorted_bam)
-        lines_for_df = [line.split('\t') for line in depth.split('\n')]
-        coverage_df = pd.DataFrame(lines_for_df, columns=['Contig','Position','Depth'], dtype=float).dropna()
-        contig_cov_mean = coverage_df.groupby(['Contig'])['Depth'].mean().reset_index(name = "Mean Coverage")
-        return contig_cov_mean
+    def align_reads_to_contig(self, contig_file):
+        samfile = os.path.join(self.tmp_dir, os.path.basename(contig_file) + ".sam")
+        bwamem_cmd = ['bwa', 'mem', contig_file, self.forward_reads, self.reverse_reads]
+        if not os.path.exists(samfile):
+            with open(samfile, "w'") as outfile:
+                    subprocess.run(bwamem_cmd, stdout=outfile)
+                       
+    def extract_all_mapped(self, samfile):
+        sam_name = os.path.splitext(os.path.basename(samfile))[0]
+        # Reads with both mates mapping
+        both_outfile = os.path.join(self.tmp_dir, sam_name + "_both.bam")
+        both_sorted_outfile = os.path.join(self.tmp_dir, sam_name + "_both_sorted.bam")
+        pysam.view('-bS', '-f', '12', '-o', both_outfile, samfile, catch_stdout = False)
+        pysam.sort('-o', both_sorted_outfile, both_outfile)
+        # Reads with only forward mapping
+        read_only_outfile = os.path.join(self.tmp_dir, sam_name + "_read.bam")
+        read_sorted_outfile = os.path.join(self.tmp_dir, sam_name + "_read_sorted.bam")
+        pysam.view('-bS', '-f', '8', '-F', '4', '-o', read_only_outfile, samfile, catch_stdout = False)
+        pysam.sort('-o', read_sorted_outfile, read_only_outfile)
+        # Reads with only mate mapping
+        mate_only_outfile = os.path.join(self.tmp_dir, sam_name + "_mate.bam")
+        mate_sorted_outfile = os.path.join(self.tmp_dir, sam_name + "_mate_sorted.bam")
+        pysam.view('-bS','-f', '4', '-F', '8', '-o', read_only_outfile, samfile, catch_stdout = False)
+        pysam.sort('-o', mate_sorted_outfile, mate_only_outfile)  
 
-    def get_contig_tetranucleotide_freq(self):
-        contig_tetramer_df_list = []
-        for seqrecord in SeqIO.parse(self.mag, "fasta"):
-            contig_name = seqrecord.id
-            contig_seq = str(seqrecord.seq)
-            contig_tetramers = self.count_tetramers(contig_seq, contig_name)
-            contig_tetramer_df_list.append(contig_tetramers)
-        contig_tetramers = pd.concat(contig_tetramer_df_list)
-        return contig_tetramers
-        
-    def count_tetramers(self, seq, seqname):
-        tetramers = {}
-        for i in range(len(seq) - 3):
-            tetramer = seq[i:i+4]
-            if tetramer in tetramers:
-                tetramers[tetramer] += 1
-            else:
-                tetramers[tetramer] = 1
-        total_tetramers = float(sum(tetramers.values()))
-        for tetra in tetramers.keys():
-            tetramers[tetra] = float(tetramers[tetra])/total_tetramers
-        tetra_df = pd.DataFrame(tetramers, index = [0])
-        tetra_df['Contig'] = seqname
-        return tetra_df
+    def merge_bams(self, both, mate1, mate2):
+        merged_outfile = os.path.join(self.tmp_dir, self.mag_name + "_merged.bam")
+        pysam.merge(merged_outfile, both, mate1, mate2)
+            
+    def write_bam_to_fq(self, bam, outfile):
+        bedtools_cmd = ['bamToFastq', '-i', bam, '-fq', outfile + '_forward.fq', '-fq2', outfile + '_reverse.fq']
+        subprocess.run(bedtools_cmd)
     
-    def build_complete_stats_df(self, tetra_df, depth_df, gc_df):
-        tetra_depth_df = tetra_df.merge(depth_df, how = "outer", on = "Contig")
-        full_df = tetra_depth_df.merge(gc_df, how = "outer", on = "Contig")
-        return full_df
+    def assemble_reads(self, forward, reverse):
+        pass # TODO: Create contig assembly
+
         
     def write_files(self):
         if self.keep_bam == True:

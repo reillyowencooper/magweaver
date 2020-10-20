@@ -111,7 +111,7 @@ class MagCov(object):
         err_df.to_csv(outfile, index = False, header = True)
         
     def run(self):
-        outfile_loc = os.path.join(self.outdir, os.path.splitext(mag)[0] + "_err_cov.csv")
+        outfile_loc = os.path.join(self.outdir, os.path.splitext(self.mag)[0] + "_err_cov.csv")
         self.create_logger()
         self.sort_bam()
         cov_dict = self.get_contig_coverage()

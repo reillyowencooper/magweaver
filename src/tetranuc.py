@@ -4,12 +4,13 @@ import numpy as np
 from Bio import SeqIO
 from sklearn import decomposition
 
+
 def MagTetranuc(object):
     
     def __init__(self, mag, outdir):
         self.mag = mag
         self.outdir = outdir
-    
+        
     def retrieve_contig_len(self):
         length_dict = {}
         for seqrecord in SeqIO.parse(self.mag, "fasta"):
@@ -59,7 +60,7 @@ def MagTetranuc(object):
     
     def find_std_component(self, contig_component_dict):
         components = [component for component in contig_component_dict.values()]
-        std = np.std(component)
+        std = np.std(components)
         return std
     
     def identify_erroneous_contigs(self, contig_component_dict, mean, std):
@@ -76,10 +77,11 @@ def MagTetranuc(object):
         err_df.to_csv(outfile, index = False, header = True)
         
     def run(self):
-        pass # Write run func tomorrow
-        
-        
-    
-    
-# TODO: Move count_tetramers, get_contig_tetranucleotide_freq here
-# TODO: Use PCA to get clusters, then flag contigs that don't cluster
+        outfile = os.path.join(self.outdir, os.path.splitext(self.mag)[0] + "_err_tetra.csv")
+        len_dict = self.retrieve_contig_len()
+        contig_tetramers = self.get_tetranucleotide_freq()
+        pca_component_dict = self.run_pca(contig_tetramers)
+        mean = self.find_mean_component(pca_component_dict, len_dict)
+        std = self.find_std_component(pca_component_dict)
+        err_df = self.identify_erroneous_contigs(pca_component_dict, mean, std)
+        self.write_df(err_df, outfile)

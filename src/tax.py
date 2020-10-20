@@ -29,7 +29,7 @@ class MagTaxonomy(object):
         formatter = logging.Formatter('%(asctime)s - %(message)s')
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
-    
+        
     def create_mag_db(self, mag_name, tmp_dir):
         '''Turns input .faa into MMseqs DB.
         mag_name: str

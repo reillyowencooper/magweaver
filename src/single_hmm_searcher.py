@@ -1,7 +1,7 @@
 import subprocess, os, shutil, csv, logging
 from Bio import SearchIO, SeqIO
 import pandas as pd
-import src.camag_utilities as utils
+import src.utilities as utils
 
 
 class SearchSingleHMM(object):

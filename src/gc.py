@@ -93,7 +93,7 @@ class MagGC(object):
         err_df.to_csv(outfile, index = False, header = True)
         
     def run(self):
-        outfile_loc = os.path.join(self.outdir, os.path.splitext(mag)[0] + "_err_gc.csv")
+        outfile_loc = os.path.join(self.outdir, os.path.splitext(self.mag)[0] + "_err_gc.csv")
         self.create_logger()
         length_dict = self.retrieve_contig_len()
         gc_dict = self.retrieve_contig_gc()
