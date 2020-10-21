@@ -12,7 +12,7 @@ class MagTaxonomy(object):
     This uses Phylum-level classification because many high-quality MAGs tend to have a misplaced phylum-level cluster,
     as per Chen et al. 2020
     '''
-    def __init__(self, output_dir, mag_aa):
+    def __init__(self, mag_aa, output_dir):
         '''Inits
         output_dir: str
             Directory to store results
@@ -137,7 +137,7 @@ class MagTaxonomy(object):
         mag_taxdb = os.path.join(tmp_dir, mag_name + "_tax")
         tax_tsv = os.path.join(tmp_dir, mag_name + "_taxonomy.tsv")
         contig_tax_outloc = os.path.join(self.output_dir, mag_name + "_taxonomy.tsv")
-        erroneous_contig_outloc = os.path.join(self.output_dir, "suspicious_taxonomy.tsv")
+        erroneous_contig_outloc = os.path.join(self.output_dir, mag_name + "_err_tax.csv")
         print('Creating MMseqs2 database from MAG')
         self.create_mag_db(self.mag_aa,
                            mag_name,
