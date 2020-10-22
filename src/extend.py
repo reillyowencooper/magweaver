@@ -31,9 +31,9 @@ class MagExtender(object):
                 self.contig_fas.append(os.path.join(self.tmp_dir, seqid))
             
     def index_contig(self):
-        '''Indexes each contig separately using BWA'''
+        '''Indexes each contig separately using Bowtie2'''
         for cfile in self.contig_fas:
-            index_cmd = ['bwa', 'index', cfile]
+            index_cmd = ['bowtie2-build', cfile, cfile]
             subprocess.run(index_cmd)    
         
     def align_reads_to_contig(self, contig_file):
