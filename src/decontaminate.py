@@ -1,4 +1,5 @@
 import os, subprocess, shutil, logging
+from collections import defaultdict
 import pandas as pd
 from Bio import SeqIO
 from src.cov import MagCov
@@ -19,7 +20,7 @@ def rank_suspicion(gc_list, cov_list, tax_list, tetra_list):
     '''Weights suspicion of contigs based on how many lists they appear in'''
     # This is probably the dumbest way to rank contigs, 
     # but I'm tired and can't think of anything better
-    sus_dict = {}
+    sus_dict = defaultdict(int)
     checked_items = []
     for item in gc_list:
         sus_dict[item] += 1
@@ -74,10 +75,10 @@ def get_consensus_contigs(mag, bam, taxdb,
                                     tax_contigs, tetra_contigs)
     return ranked_contigs
     
-def remove_sus_contigs(mag, ranked_contig_dict, outdir):
+def remove_sus_contigs(mag, ranked_contig_dict, outdir, minimum_suspicion=3):
     outfile = os.path.join(outdir, os.path.basename(mag))
     for contig_name, sus_rank in ranked_contig_dict.items():
-        if sus_rank == 4:
+        if sus_rank >= minimum_suspicion:
             for seqrecord in SeqIO.parse(mag, "fasta"):
                 seq_name = seqrecord.id
                 if not seq_name == contig_name:

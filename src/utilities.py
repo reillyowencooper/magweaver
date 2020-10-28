@@ -14,4 +14,17 @@ def run_hmmsearch(aa_file, e_value, output_path, hmm):
 def predict_cds(mag, output_path):
     '''Runs Prodigal on an input MAG'''
     prodigal_cmd = ['prodigal', '-i', mag, '-a', output_path, '-p', 'meta', '-q']
-    subprocess.run(prodigal_cmd)
+    if not os.path.exists(output_path):
+        subprocess.run(prodigal_cmd)
+        
+def parse_hmmtbl(hmm_tblout):
+    lines = []
+    with open(hmm_tblout, 'r') as tbl:
+        for line in tbl:
+            if line.startswith('#'):
+                continue
+            else:
+                line = line.strip()
+                fixedline = line[18:] + [' '.join(line[:18])]
+                lines.append(fixedline)
+    return lines
