@@ -1,4 +1,5 @@
-import os, subprocess, logging
+import os, subprocess, shutil
+
 
 def create_dir(filepath):
     '''Checks if a directory exists then creates it if not'''
@@ -24,7 +25,9 @@ def parse_hmmtbl(hmm_tblout):
             if line.startswith('#'):
                 continue
             else:
-                line = line.strip()
-                fixedline = line[18:] + [' '.join(line[:18])]
-                lines.append(fixedline)
+                line = line.split()
+                lines.append(line)
     return lines
+
+def remove_tmp_dir(tmp_dir):
+    shutil.rmtree(tmp_dir)

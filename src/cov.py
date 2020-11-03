@@ -1,37 +1,43 @@
-import os, subprocess, shutil, logging
+import os, subprocess, shutil
 import pandas as pd
 import numpy as np
 import pysam
-from Bio import SeqIO, SearchIO
+from Bio import SeqIO
+import src.utilities as utils
+
+# NOTE: Might move BAM file handling to a separate file, because I have a feeling I'll need to implement mapping in other places
 
 class MagCov(object):
     '''Evalutes read coverage in a MAG.'''
-    def __init__(self, mag, bam, outdir):
+    def __init__(self, mag, forward_reads, reverse_reads, outdir, tmp_dir):
         '''Inits.
         mag: str
             Path to MAG of interest
-        bam: str
-            Path to BAM file of reads mapped to MAG
         outdir: str
             Directory to output erroneous contig file
         '''
         self.mag = mag
-        self.bam = bam
+        self.forward_reads = forward_reads
+        self.reverse_reads = reverse_reads
         self.outdir = outdir
+        self.tmp_dir = tmp_dir
+        self.mag_name = os.path.splitext(os.path.basename(self.mag))[0]
         
-    def create_logger(self):
-        self.logger = logging.getLogger(__file__)
-        self.logger.setLevel(logging.INFO)
-        fh = logging.FileHandler('cov.log')
-        fh.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(message)s')
-        fh.setFormatter(formatter)
-        self.logger.addHandler(fh)
+    def index_mag(self):
+        self.index_loc = os.path.join(self.tmp_dir, os.path.basename(self.mag))
+        if not os.path.exists(self.index_loc):
+            shutil.copyfile(self.mag, self.index_loc)
+        index_cmd = ['bwa', 'index', self.index_loc]
+        subprocess.run(index_cmd)
+    
+    def map_reads(self):
+        self.bam_loc = os.path.join(self.tmp_dir, self.mag_name + ".bam")
+        full_cmd = "bwa mem " + self.tmp_mag_loc + " " + self.forward_reads + " " + self.reverse_reads + " | samtools sort -o " + self.bam_loc + " -"
+        subprocess.call(full_cmd, shell = True) # This is not how I want to implement, but best way to get to BAM immediately for right now
         
     def sort_bam(self):
         '''Sorts BAM file for further steps'''
-        self.logger.info('Sorting input BAM')
-        self.sorted_bam = os.path.join(self.outdir, os.path.splitext(bam)[0] + "_sorted.bam")
+        self.sorted_bam = os.path.join(self.tmp_dir, self.mag_name + "_sorted.bam")
         if not os.path.exists(self.sorted_bam):
             pysam.sort("-o", self.sorted_bam, self.bam_file)
             
@@ -41,23 +47,18 @@ class MagCov(object):
         cov_dict: dict
             Dictionary of contig name:mean coverage
         '''
-        self.logger.info('Calculating coverage depth for ' + self.mag + ' using ' + self.bam)
         depth = pysam.depth(self.sorted_bam)
         lines_for_df = [line.split('\t') for line in depth.split('\n')]
         cov_df = pd.DataFrame(lines_for_df, columns = ['Contig', 'Position', 'Depth'], dtype = float).dropna()
-        self.logger.info('Calculating mean coverage per contig')
         contig_cov_df = cov_df.groupby(['Contig'])['Depth'].mean().reset_index(name = 'Mean Coverage')
         cov_dict = dict(zip(contig_cov_df['Contig'], contig_cov_df['Mean Coverage']))
         return cov_dict
     
     def retrieve_contig_len(self):
         '''Creates a dict of contig name:contig length'''
-        self.logger.info('Retrieving contig lengths')
         length_dict = {}
         for seqrecord in SeqIO.parse(self.mag, "fasta"):
-            seqid = seqrecord.id
-            seqlen = len(seqrecord.seq)
-            length_dict[seqid] = seqlen
+            length_dict[seqrecord.id] = len(seqrecord.seq)
         return length_dict
     
     def find_mean_cov(self, cov_dict, len_dict):
@@ -71,7 +72,6 @@ class MagCov(object):
         mean: float
             Weighted mean of coverage across MAG
         '''
-        self.logger.info('Calculating weighted mean coverage across MAG')
         lengths = [length for length in len_dict.values()]
         cov = [cov for cov in cov_dict.values()]
         mean = np.average(cov, weights = lengths)
@@ -79,7 +79,6 @@ class MagCov(object):
     
     def find_std_cov(self, cov_dict):
         '''Finds standard deviation of coverage across MAG.'''
-        self.logger.info('Calculating coverage standard deviation across MAG')
         cov = [cov for cov in cov_dict.values()]
         std = np.std(cov)
         return std
@@ -95,29 +94,28 @@ class MagCov(object):
         Returns:
             DataFrame of Contig, Coverage for erroneous contigs
         '''
-        self.logger.info('Flagging contigs with erroneous coverage')
         erroneous_contigs = {}
         min_cov = mean_cov - std_cov
         max_cov = mean_cov + std_cov
         for contig, cov in cov_dict.items():
             if (cov > max_cov) or (cov < min_cov):
                 erroneous_contigs[contig] = cov
-        err_df = pd.DataFrame(list(erroneous_contigs.items()), column = ['Contig', 'Coverage'])
+        err_df = pd.DataFrame(list(erroneous_contigs.items()), columns = ['Contig', 'Coverage'])
         return err_df
     
     def write_df(self, err_df, outfile):
         '''Writes DataFrame to file'''
-        self.logger.info('Writing erroneous contig data to ' + outfile)
         err_df.to_csv(outfile, index = False, header = True)
         
     def run(self):
         outfile_loc = os.path.join(self.outdir, os.path.splitext(self.mag)[0] + "_err_cov.csv")
-        self.create_logger()
+        self.index_mag()
+        self.map_reads()
         self.sort_bam()
         cov_dict = self.get_contig_coverage()
         length_dict = self.retrieve_contig_len()
         mean_cov = self.find_mean_cov(cov_dict, length_dict)
         std_cov = self.find_std_cov(cov_dict)
         err_df = self.identify_erroneous_contigs(mean_cov, std_cov, cov_dict)
-        self.write(err_df, outfile_loc)
+        self.write_df(err_df, outfile_loc)
     

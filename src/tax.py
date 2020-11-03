@@ -1,6 +1,7 @@
-import os, subprocess, shutil, logging
+import os, subprocess, shutil
 import pandas as pd
 from collections import Counter
+import src.utilities as utils
     
 
 class MagTaxonomy(object):
@@ -12,24 +13,20 @@ class MagTaxonomy(object):
     This uses Phylum-level classification because many high-quality MAGs tend to have a misplaced phylum-level cluster,
     as per Chen et al. 2020
     '''
-    def __init__(self, mag_aa, output_dir):
+    def __init__(self, mag, outdir, tmp_dir):
         '''Inits
-        output_dir: str
+        outdir: str
             Directory to store results
         mag_aa = Path to file contianing predicted MAG amino acids (usually generated with Prodigal)
         '''
-        self.output_dir = output_dir
-        self.mag_aa = mag_aa
+        self.outdir = outdir
+        self.mag = mag
+        self.tmp_dir = tmp_dir
         
-    def create_logger(self):
-        self.logger = logging.getLogger(__file__)
-        self.logger.setLevel(logging.INFO)
-        fh = logging.FileHandler('tax.log')
-        fh.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(message)s')
-        fh.setFormatter(formatter)
-        self.logger.addHandler(fh)
-        
+    def get_orfs(self, mag_name):
+        self.mag_aa = os.path.join(self.tmp_dir, mag_name + ".faa")
+        utils.predict_cds(self.mag, self.mag_aa)
+
     def create_mag_db(self, mag_name, tmp_dir):
         '''Turns input .faa into MMseqs DB.
         mag_name: str
@@ -37,16 +34,13 @@ class MagTaxonomy(object):
         tmp_dir: str
             Directory to store temporary files (in this case, the MMseqs db)
         '''
-        self.logger.info('Creating MMseqs DB from ' + self.mag_aa)
         createdb_cmd = ['mmseqs', 'createdb', self.mag_aa, os.path.join(tmp_dir, mag_name + "_db")]
         subprocess.run(createdb_cmd)
         
-    def get_contig_taxonomy(self, mag_db, mag_name, search_db, magtax_db, tmp_dir, output_file):
+    def get_contig_taxonomy(self, mag_db, search_db, magtax_db, tmp_dir, output_file):
         '''Gets contig taxonomy using MMseqs and generates results TSV
         mag_db: str
             Path to MAG MMseqs DB
-        mag_name: str
-            Name of MAG of interest
         search_db: str
             Path to MMseqs search DB - usually using SwissProt
         magtax_db: str
@@ -58,9 +52,7 @@ class MagTaxonomy(object):
         '''
         gettax_cmd = ['mmseqs', 'taxonomy', mag_db, search_db, magtax_db, tmp_dir, '--merge-query', "1", '--remove-tmp-files', '--tax-lineage', "1"]
         tsv_cmd = ['mmseqs', 'createtsv', mag_db, magtax_db, output_file]
-        self.logger.info('Searching contigs for taxonomic hits')
         subprocess.run(gettax_cmd)
-        self.logger.info('Generating taxonomy TSV')
         subprocess.run(tsv_cmd)
         
     def parse_contig_taxonomy(self, mag_tax_tsv):
@@ -71,7 +63,6 @@ class MagTaxonomy(object):
         tax
             DataFrame with CDS-level taxonomy
         '''
-        self.logger.info('Cleaning contig taxonomy')
         tax = pd.read_csv(mag_tax_tsv, sep = '\t', header=None, names=['Contig','Acc','Cat','LCA','Full Tax'])
         tax = tax.join(tax['Full Tax'].str.split(';', expand = True)).drop(['Acc', 'Cat', 'Full Tax'], axis = 1)
         tax[['Contig Name','ORF']] = tax['Contig'].str.rsplit('_', 1, expand=True)
@@ -89,7 +80,6 @@ class MagTaxonomy(object):
             DataFrame with each contig's consensus taxonomic rank, the
             most common phylum-level identity across that contig's CDS
         '''
-        self.logger.info('Generating phylum-level consensus taxonomy per contig')
         contig_tax = {}
         contig_names = clean_mag_tax_df['Contig Name'].unique().tolist()
         for contig in contig_names:
@@ -113,20 +103,18 @@ class MagTaxonomy(object):
         erroneous_contigs:
             Subset of contig_tax_df only containing contigs not matching consensus
         '''
-        self.logger.info('Flagging contigs with phylum hit that does not match consensus')
+        erroneous_contigs = {}
         phylum_ids = contig_tax_df['Phylum'].tolist()
         most_common_phylum = Counter(phylum_ids).most_common(1)[0][0]
-        erroneous_contigs = phylum_ids[phylum_ids['Phylum'] != most_common_phylum]
-        return erroneous_contigs
+        for index, row in contig_tax_df.iterrows():
+            if row['Phylum'] != most_common_phylum:
+                erroneous_contigs[row['Contig']] = row['Phylum']
+        err_df = pd.DataFrame(list(erroneous_contigs.items()), columns = ['Contig', 'Phylum'])
+        return err_df
     
     def write_taxonomy_df(self, tax_df, output_file):
         '''Writes consensus and erroneous DataFrames to file.'''
-        self.logger.info('Writing output to ' + output_file)
         tax_df.to_csv(output_file, index = False, header = True)
-        
-    def remove_tmp_files(self, tmp_dir):
-        '''Removes the temporary directory and all files inside.'''
-        shutil.rmtree(tmp_dir)
         
     def run(self,
             search_db, 
@@ -136,15 +124,12 @@ class MagTaxonomy(object):
         mag_db = os.path.join(tmp_dir, mag_name + "_db")
         mag_taxdb = os.path.join(tmp_dir, mag_name + "_tax")
         tax_tsv = os.path.join(tmp_dir, mag_name + "_taxonomy.tsv")
-        contig_tax_outloc = os.path.join(self.output_dir, mag_name + "_taxonomy.tsv")
         erroneous_contig_outloc = os.path.join(self.output_dir, mag_name + "_err_tax.csv")
-        print('Creating MMseqs2 database from MAG')
+        self.get_orfs(mag_name)
         self.create_mag_db(self.mag_aa,
                            mag_name,
                            tmp_dir)
-        print('Identifying contig taxonomy')
         self.get_contig_taxonomy(mag_db,
-                                 mag_name,
                                  search_db,
                                  mag_taxdb,
                                  tmp_dir,
@@ -152,6 +137,4 @@ class MagTaxonomy(object):
         contig_taxonomy = self.parse_contig_taxonomy(tax_tsv)
         consensus_taxonomy = self.get_contig_consensus_tax(contig_taxonomy)
         erroneous_taxonomy = self.identify_erroneous_contigs(consensus_taxonomy)
-        self.write_taxonomy_df(consensus_taxonomy, contig_tax_outloc)
         self.write_taxonomy_df(erroneous_taxonomy, erroneous_contig_outloc)
-        self.remove_tmp_files(tmp_dir)

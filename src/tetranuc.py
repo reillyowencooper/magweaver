@@ -1,23 +1,17 @@
-import os, subprocess, shutil, logging
+import os, subprocess, shutil
 import pandas as pd
 import numpy as np
 from Bio import SeqIO
 from sklearn import decomposition
+from src.file_handling import ReadNucFasta
 
 
 def MagTetranuc(object):
     
     def __init__(self, mag, outdir):
-        self.mag = mag
+        self.mag = ReadNucFasta(mag).fasta
+        self.len_dict = ReadNucFasta(mag).retrieve_contig_len()
         self.outdir = outdir
-        
-    def retrieve_contig_len(self):
-        length_dict = {}
-        for seqrecord in SeqIO.parse(self.mag, "fasta"):
-            seqid = seqrecord.id
-            seqlen = len(seqrecord.seq)
-            length_dict[seqid] = seqlen
-        return length_dict
         
     def count_tetramers(self, seq, seqname):
         tetramers = {}
@@ -37,16 +31,15 @@ def MagTetranuc(object):
     def get_tetranucleotide_freq(self):
         contig_tetramer_df_list = []
         for seqrecord in SeqIO.parse(self.mag, "fasta"):
-            contig_name = seqrecord.id
-            contig_seq = str(seqrecord.seq)
-            contig_tetramers = self.count_tetramers(contig_seq, contig_name)
+            contig_tetramers = self.count_tetramers(str(seqrecord.seq), seqrecord.id)
             contig_tetramer_df_list.append(contig_tetramers)
         contig_tetramers = pd.concat(contig_tetramer_df_list)
         return contig_tetramers
     
     def run_pca(self, contig_tetramer_df):
         pca = decomposition.PCA(n_components = 1)
-        pca.fit(contig_tetramer_df)
+        tetramers_no_contignames = contig_tetramer_df.drop(columns = ['Contig']).fillna(0)
+        pca.fit(tetramers_no_contignames)
         first_axis = pca.components_[0]
         contig_names = contig_tetramer_df['Contig'].tolist()
         contig_component_dict = dict(zip(contig_names, first_axis))
@@ -78,10 +71,9 @@ def MagTetranuc(object):
         
     def run(self):
         outfile = os.path.join(self.outdir, os.path.splitext(self.mag)[0] + "_err_tetra.csv")
-        len_dict = self.retrieve_contig_len()
         contig_tetramers = self.get_tetranucleotide_freq()
         pca_component_dict = self.run_pca(contig_tetramers)
-        mean = self.find_mean_component(pca_component_dict, len_dict)
+        mean = self.find_mean_component(pca_component_dict, self.len_dict)
         std = self.find_std_component(pca_component_dict)
         err_df = self.identify_erroneous_contigs(pca_component_dict, mean, std)
         self.write_df(err_df, outfile)

@@ -1,4 +1,14 @@
 import os, subprocess, gzip, shutil
+import src.file_handling as filehandling
+
+
+#### TODO: Rework this so all that needs to be downloaded is the SwissProt DB and gunzip the SCG markers in data
+
+class DataBaseHandler(object):
+    
+    def __init__(self, database_dir):
+        self.database_dir = database_dir
+        self.dbs = {}
 
 class DatabaseDownloader:
     """Acts as a handler for HMM and sequence databases to search FASTAs against.

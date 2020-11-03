@@ -10,28 +10,25 @@ class MagSCG(object):
     This uses the Bacteria HMMs from Albertsen et al., 2013, found at https://github.com/MadsAlbertsen/multi-metagenome/blob/master/R.data.generation/essential.hmm
     NOTE: This is a bacteria-specific HMM set, should probably add Archaea at some point
     '''
-    def __init__(self, mag, scg_db, outdir):
+    def __init__(self, mag, scg_db, outdir, tmp_dir):
         self.mag = mag
         self.mag_name = os.path.splitext(os.path.basename(mag))[0]
         self.scg_db = scg_db
         self.outdir = outdir
-        self.tmp = os.path.join(self.outdir, "tmp")
+        self.tmp_dir = tmp_dir
         self.evalue = "1e-15"
-        
-    def create_tmp(self):
-        utils.create_dir(self.tmp)
         
     def get_aas(self):
         self.aas = os.path.join(self.tmp, self.mag_name + ".faa")
         utils.predict_cds(self.mag, self.aas)
         
     def search_scgs(self):
-        self.essential = os.path.join(self.tmp, self.mag_name + "_essential.tab")
+        self.essential = os.path.join(self.tmp_dir, self.mag_name + "_essential.tab")
         utils.run_hmmsearch(self.aas, self.evalue, self.bac, self.scg_db)
         
     def find_potential_redundancy(self):
         hmm_hits = defaultdict(int)
-        essential = utils.parse_hmmtbl(self.esssential)
+        essential = utils.parse_hmmtbl(self.essential)
         for line in essential:
             hmm_acc = line[3]
             hmm_hits[hmm_acc] += 1
@@ -51,18 +48,13 @@ class MagSCG(object):
     
     def write_df(self, err_df, outfile):
         err_df.to_csv(outfile, index = False, header = True)
-        
-    def remove_tmp(self):
-        shutil.rmtree(self.tmp)
-        
+
     def run(self):
         outfile_loc = os.path.join(self.outdir, self.mag_name + "_err_scg.csv")
-        self.create_tmp()
         self.get_aas()
         self.search_scgs()
         err_df = self.find_potential_redundancy()
         self.write_df(err_df, outfile_loc)
-        self.remove_tmp()
                 
                         
                         
