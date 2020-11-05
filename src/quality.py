@@ -1,4 +1,4 @@
-import os, subprocess, shutil, logging
+import os, subprocess, shutil
 import pandas as pd
 import numpy as np
 import src.utilities as utils
@@ -18,19 +18,9 @@ class QualityChecker(object):
         self.completeness_val = completeness_val
         self.contam_val = contam_value
         self.num_contigs = num_contigs
-        
-    def create_logger(self):
-        self.logger = logging.getLogger(__file__)
-        self.logger.setLevel(logging.INFO)
-        fh = logging.FileHandler('completeness.log')
-        fh.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(message)s')
-        fh.setFormatter(formatter)
-        self.logger.addHandler(fh)
             
     def run_checkm(self, outloc):
         '''Runs CheckM on a given set of MAGs'''
-        self.logger.info('Checking MAG completeness and contamination using CheckM')
         checkm_cmd = ['checkm', 'lineage_wf', '-x', 'fa', '-f', outloc, '--tab_table', self.mag_dir, self.output_dir]
         subprocess.run(checkm_cmd)     
     
@@ -53,8 +43,6 @@ class QualityChecker(object):
         1. Bins as high (HQ), medium (MQ), or low (LQ) quality
         2. Number of contigs in a bin
         '''
-        self.logger.info('Checking MAG quality using ' + self.completeness_val + ' as Completeness cutoff and ' +
-                         self.contam_val + ' as Contamination cutoff')
         checkm_df = pd.read_csv(self.checkm_outpath, sep='\t')
         wanted_cols = checkm_df[['Bin Id', 'Completeness', 'Contamination']]
         df_with_contig_nums = pd.merge(wanted_cols, contig_count_df, on = 'Bin Id', how = 'outer')
@@ -77,7 +65,6 @@ class QualityChecker(object):
             mag_name = os.path.splitext(mag)[0]
             for hqname in hq_names:
                 if mag_name == hqname:
-                    self.logger.ino('Identified ' + mag_name + ' as high quality, copying to ' + self.output_dir)
                     shutil.copyfile(mag, os.path.join(self.output_dir, mag))
                     
     def run(self):

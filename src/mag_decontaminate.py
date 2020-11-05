@@ -16,8 +16,7 @@ class Decontaminator(object):
                  reverse_reads, 
                  swissprot_db, 
                  scg_db,
-                 outdir,
-                 tmp_dir):
+                 outdir):
         self.mag = mag
         self.forward_reads = forward_reads
         self.reverse_reads = reverse_reads
@@ -25,9 +24,10 @@ class Decontaminator(object):
         self.scg_db = scg_db
         self.mag_name = os.path.splitext(os.path.basename(self.mag))[0]
         self.outdir = outdir
-        self.tmp_dir = tmp_dir
+        self.tmp_dir = os.path.join(self.outdir, "tmp")
 
     def get_mag_gc(self):
+        logging.info('Flagging contigs with erroneous GC content in ' + self.mag_name)
         gc = MagGC(self.mag, self.outdir)
         gc.run()
         gc_df = pd.read_csv(self.mag_name + "_err_gc.csv")
@@ -36,6 +36,7 @@ class Decontaminator(object):
         return gc_contigs
     
     def get_mag_cov(self):
+        logging.info('Flagging contigs with erroneous read coverage content in ' + self.mag_name)
         cov = MagCov(self.mag, self.forward_reads, self.reverse_reads, self.outdir, self.tmp_dir)
         cov.run()
         cov_df = pd.read_csv(self.mag_name + "_err_cov.csv")
@@ -44,6 +45,7 @@ class Decontaminator(object):
         return cov_contigs
     
     def get_mag_tax(self):
+        logging.info('Flagging contigs with erroneous taxonomy in ' + self.mag_name)
         tax = MagTaxonomy(self.mag, self.outdir, self.tmp_dir)
         tax.run(self.swissprot_db, self.tmp_dir)
         tax_df = pd.read_csv(self.mag_name + "_err_tax.csv")
@@ -52,6 +54,7 @@ class Decontaminator(object):
         return tax_contigs
     
     def get_mag_tetra(self):
+        logging.info('Flagging contigs with erroneous tetranucleotide frequencies in ' + self.mag_name)
         tetra = MagTetranuc(self.mag, self.outdir)
         tetra.run()
         tetra_df = pd.read_csv(self.mag_name + "_err_tetra.csv")
@@ -60,11 +63,13 @@ class Decontaminator(object):
         return tetra_contigs
     
     def rank_suspicion(self, gc_contigs, cov_contigs, tax_contigs, tetra_contigs):
+        logging.info('Ranking contigs by suspicious content for ' + self.mag_name)
         all_lists = gc_contigs + cov_contigs + tax_contigs + tetra_contigs
         sus_dict = dict(Counter(all_lists))
         return sus_dict
     
     def find_high_sus_contigs(self, sus_dict, minimum_suspicion):
+        logging.info('Flagging contigs with suspicion greater than or equal to ' + minimum_suspicion + ' in ' + self.mag_name)
         high_sus_contigs = []
         for contig_name, sus_rank in sus_dict.items():
             if sus_rank >= minimum_suspicion:
@@ -72,6 +77,7 @@ class Decontaminator(object):
         return high_sus_contigs
     
     def filter_mag(self, high_sus_contigs):
+        logging.info('Filtering ' + self.mag_name + ' of contigs over minimum suspicion')
         mag_fasta = filehandling.ReadNucFasta(self.mag)
         contigs = mag_fasta.retrieve_contigs()
         filtered_contigs = {contig_name: contig_seq for contig_name, contig_seq in contigs.items() if not contig_name in high_sus_contigs}
@@ -79,6 +85,7 @@ class Decontaminator(object):
     
     def write_fasta(self, contig_dict):
         outfile = os.path.join(self.outdir, self.mag_name + "_decontaminated.fa")
+        logging.info('Writing filtered version of ' + self.mag_name + ' to ' + outfile)
         for contig_name, contig_seq in contig_dict:
             with open(outfile, 'w') as outmag:
                 outmag.write('>' + str(contig_name) + '\n' + str(contig_seq) + '\n')
@@ -100,6 +107,8 @@ class Decontaminator(object):
         return len(start_mag), num_removed_contigs, seqlength_removed
         
     def run(self, minimum_suspicion_limit):
+        utils.create_dir(self.outdir)
+        utils.create_dir(self.tmp_dir)
         gc = self.get_mag_gc()
         cov = self.get_mag_cov()
         tax = self.get_mag_tax()
@@ -109,6 +118,14 @@ class Decontaminator(object):
         filtered_contigs = self.filter_mag(very_suspicious)
         self.write_fasta(filtered_contigs)
         stats = self.compare_after_decontam(filtered_contigs)
-        print('Removed ' + stats[1] + ' of an initial ' + stats[0] + ' contigs from ' + self.mag_name + ' , reducing MAG length by ' + stats[2])
-        
-        
+        logging.info('After filtering ' + self.mag_name + ', ' + stats[1] + ' contigs were removed, removing ' + stats[2] + ' from an initial length of ' + stats[0])
+        utils.remove_tmp_dir(self.tmp_dir)        
+
+def decontaminate_wrapper(swissprot_db, scg_db, **kwargs):
+    decontam = Decontaminator(kwargs['input_mag'],
+                              kwargs['forward_reads'],
+                              kwargs['reverse_reads'],
+                              swissprot_db,
+                              scg_db,
+                              kwargs['output_dir'])
+    decontam.run(kwargs['suspicion'])
