@@ -6,12 +6,13 @@ from sklearn import decomposition
 from src.file_handling import ReadNucFasta
 
 
-def MagTetranuc(object):
+class MagTetranuc(object):
     
     def __init__(self, mag, outdir):
+        self.outdir = outdir
         self.mag = ReadNucFasta(mag).fasta
         self.len_dict = ReadNucFasta(mag).retrieve_contig_len()
-        self.outdir = outdir
+        self.mag_name = os.path.splitext(os.path.basename(mag))[0]
         
     def count_tetramers(self, seq, seqname):
         tetramers = {}
@@ -70,7 +71,7 @@ def MagTetranuc(object):
         err_df.to_csv(outfile, index = False, header = True)
         
     def run(self):
-        outfile = os.path.join(self.outdir, os.path.splitext(self.mag)[0] + "_err_tetra.csv")
+        outfile = os.path.join(self.outdir, self.mag_name + "_err_tetra.csv")
         contig_tetramers = self.get_tetranucleotide_freq()
         pca_component_dict = self.run_pca(contig_tetramers)
         mean = self.find_mean_component(pca_component_dict, self.len_dict)

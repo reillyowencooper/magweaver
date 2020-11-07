@@ -16,6 +16,7 @@ class MagGC(object):
         self.mag = ReadNucFasta(mag).fasta
         self.len_dict = ReadNucFasta(mag).retrieve_contig_len()
         self.outdir = outdir
+        self.mag_name = os.path.splitext(os.path.basename(mag))[0]
     
     def retrieve_contig_gc(self):
         '''Creates a dict of contig name: contig GC content'''
@@ -57,8 +58,8 @@ class MagGC(object):
             DataFrame of Contig, GC content for erroneous contigs
         '''
         erroneous_contigs = {}
-        min_gc = mean_gc - 2*std_gc
-        max_gc = mean_gc + 2*std_gc
+        min_gc = mean_gc - std_gc
+        max_gc = mean_gc + std_gc
         for contig, gc in gc_dict.items():
             if (gc > max_gc) or (gc < min_gc):
                 erroneous_contigs[contig] = gc
@@ -70,7 +71,7 @@ class MagGC(object):
         err_df.to_csv(outfile, index = False, header = True)
         
     def run(self):
-        outfile_loc = os.path.join(self.outdir, os.path.splitext(self.mag)[0] + "_err_gc.csv")
+        outfile_loc = os.path.join(self.outdir, self.mag_name + "_err_gc.csv")
         gc_dict = self.retrieve_contig_gc()
         mean_gc = self.find_mean_gc(self.len_dict, gc_dict)
         std_gc = self.find_std_gc(gc_dict)

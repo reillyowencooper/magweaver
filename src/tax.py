@@ -21,6 +21,7 @@ class MagTaxonomy(object):
         '''
         self.outdir = outdir
         self.mag = mag
+        self.mag_name = os.path.splitext(os.path.basename(mag))[0]
         self.tmp_dir = tmp_dir
         
     def get_orfs(self, mag_name):
@@ -66,7 +67,6 @@ class MagTaxonomy(object):
         tax = pd.read_csv(mag_tax_tsv, sep = '\t', header=None, names=['Contig','Acc','Cat','LCA','Full Tax'])
         tax = tax.join(tax['Full Tax'].str.split(';', expand = True)).drop(['Acc', 'Cat', 'Full Tax'], axis = 1)
         tax[['Contig Name','ORF']] = tax['Contig'].str.rsplit('_', 1, expand=True)
-        tax = tax.drop(['Contig'], axis = 1)
         tax = tax.drop(tax.iloc[:, 10:36], axis = 1)
         tax = tax[tax['LCA'] != 'unclassified']
         return tax
@@ -120,14 +120,12 @@ class MagTaxonomy(object):
             search_db, 
             tmp_dir):
         '''Runs MagTaxonomy on a given input MAG.'''
-        mag_name = os.path.splitext(os.path.basename(self.mag_aa))[0]
-        mag_db = os.path.join(tmp_dir, mag_name + "_db")
-        mag_taxdb = os.path.join(tmp_dir, mag_name + "_tax")
-        tax_tsv = os.path.join(tmp_dir, mag_name + "_taxonomy.tsv")
-        erroneous_contig_outloc = os.path.join(self.output_dir, mag_name + "_err_tax.csv")
-        self.get_orfs(mag_name)
-        self.create_mag_db(self.mag_aa,
-                           mag_name,
+        mag_db = os.path.join(tmp_dir, self.mag_name + "_db")
+        mag_taxdb = os.path.join(tmp_dir, self.mag_name + "_tax")
+        tax_tsv = os.path.join(tmp_dir, self.mag_name + "_taxonomy.tsv")
+        erroneous_contig_outloc = os.path.join(self.outdir, self.mag_name + "_err_tax.csv")
+        self.get_orfs(self.mag_name)
+        self.create_mag_db(self.mag_name,
                            tmp_dir)
         self.get_contig_taxonomy(mag_db,
                                  search_db,

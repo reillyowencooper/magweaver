@@ -22,7 +22,8 @@ class MagCov(object):
         self.outdir = outdir
         self.tmp_dir = tmp_dir
         self.mag_name = os.path.splitext(os.path.basename(self.mag))[0]
-        
+        self.bam_loc = os.path.join(self.tmp_dir, self.mag_name + ".bam")
+    
     def index_mag(self):
         self.index_loc = os.path.join(self.tmp_dir, os.path.basename(self.mag))
         if not os.path.exists(self.index_loc):
@@ -31,15 +32,8 @@ class MagCov(object):
         subprocess.run(index_cmd)
     
     def map_reads(self):
-        self.bam_loc = os.path.join(self.tmp_dir, self.mag_name + ".bam")
-        full_cmd = "bwa mem " + self.tmp_mag_loc + " " + self.forward_reads + " " + self.reverse_reads + " | samtools sort -o " + self.bam_loc + " -"
+        full_cmd = "bwa mem " + self.index_loc + " " + self.forward_reads + " " + self.reverse_reads + " | samtools sort -o " + self.bam_loc + " -"
         subprocess.call(full_cmd, shell = True) # This is not how I want to implement, but best way to get to BAM immediately for right now
-        
-    def sort_bam(self):
-        '''Sorts BAM file for further steps'''
-        self.sorted_bam = os.path.join(self.tmp_dir, self.mag_name + "_sorted.bam")
-        if not os.path.exists(self.sorted_bam):
-            pysam.sort("-o", self.sorted_bam, self.bam_file)
             
     def get_contig_coverage(self):
         '''Gets per-contig mean coverage
@@ -47,7 +41,7 @@ class MagCov(object):
         cov_dict: dict
             Dictionary of contig name:mean coverage
         '''
-        depth = pysam.depth(self.sorted_bam)
+        depth = pysam.depth(self.bam_loc)
         lines_for_df = [line.split('\t') for line in depth.split('\n')]
         cov_df = pd.DataFrame(lines_for_df, columns = ['Contig', 'Position', 'Depth'], dtype = float).dropna()
         contig_cov_df = cov_df.groupby(['Contig'])['Depth'].mean().reset_index(name = 'Mean Coverage')
@@ -108,10 +102,10 @@ class MagCov(object):
         err_df.to_csv(outfile, index = False, header = True)
         
     def run(self):
-        outfile_loc = os.path.join(self.outdir, os.path.splitext(self.mag)[0] + "_err_cov.csv")
-        self.index_mag()
-        self.map_reads()
-        self.sort_bam()
+        outfile_loc = os.path.join(self.outdir, self.mag_name + "_err_cov.csv")
+        if not os.path.exists(self.bam_loc):
+            self.index_mag()
+            self.map_reads()
         cov_dict = self.get_contig_coverage()
         length_dict = self.retrieve_contig_len()
         mean_cov = self.find_mean_cov(cov_dict, length_dict)
