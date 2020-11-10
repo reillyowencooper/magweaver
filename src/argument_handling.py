@@ -84,10 +84,11 @@ def parse_args(args):
     
 class Shuttler(object):
     '''Take argparse inputs and enacts correct commands'''
-    def __init__(self, swissprot_db, scg_db):
+    def __init__(self, swissprot_db, scg_db, trep_db):
         self.logger = logging.getLogger()
         self.swissprot_db = swissprot_db
         self.scg_db = scg_db
+        self.trep_db = trep_db
         
     def create_logger(self, **kwargs):
         self.logger = logging.getLogger()

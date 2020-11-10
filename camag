@@ -27,15 +27,13 @@ def main():
     args = parse_args(sys.argv[1:])
     
     # Initialize databases
-    SWISSPROT_DB = os.path.join(os.path.dirname(__file__), "data/swissprot/swissprot")
-    SCG_DB = os.path.join(os.path.dirname(__file__), "data/essential.hmm")
-    
-    if not os.path.exists(SWISSPROT_DB) or not os.path.exists(SCG_DB):
-        dbs = DataBaseHandler()
-        dbs.run()
+    dbs = DataBaseHandler()
+    db_locs = dbs.run()
     
     # Run toolkit
-    shuttler = Shuttler(SWISSPROT_DB, SCG_DB)
+    shuttler = Shuttler(db_locs['swissprot'], 
+                        db_locs['scg'], 
+                        db_locs['trep_db'])
     shuttler.route_args(args)
     
 

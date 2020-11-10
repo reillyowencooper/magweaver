@@ -16,11 +16,13 @@ class Decontaminator(object):
                  reverse_reads, 
                  swissprot_db, 
                  scg_db,
+                 trep_db,
                  outdir):
         self.mag = mag
         self.forward_reads = forward_reads
         self.reverse_reads = reverse_reads
         self.swissprot_db = swissprot_db
+        self.trep_db = trep_db
         self.scg_db = scg_db
         self.mag_name = os.path.splitext(os.path.basename(self.mag))[0]
         self.outdir = outdir
@@ -92,6 +94,9 @@ class Decontaminator(object):
     
     def check_scgs(self, contig_dict):
         pass # Do something here with the single-copy genes
+    
+    def check_trep(self, contig_dict):
+        pass # Check for eukaryotic mobile elements here
         
     def compare_after_decontam(self, filtered_contig_dict):
         start_mag = filehandling.ReadNucFasta(self.mag).retrieve_contigs()
@@ -122,11 +127,12 @@ class Decontaminator(object):
         print('After filtering ' + self.mag_name + ', ' + str(stats[1]) + ' contigs were removed, removing ' + str(stats[2]) + ' from an initial length of ' + str(stats[0]))
         utils.remove_tmp_dir(self.tmp_dir)        
 
-def decontaminate_wrapper(swissprot_db, scg_db, **kwargs):
+def decontaminate_wrapper(swissprot_db, scg_db, trep_db, **kwargs):
     decontam = Decontaminator(kwargs['input_mag'],
                               kwargs['forward_reads'],
                               kwargs['reverse_reads'],
                               swissprot_db,
                               scg_db,
+                              trep_db,
                               kwargs['output_dir'])
     decontam.run(kwargs['suspicion'])
