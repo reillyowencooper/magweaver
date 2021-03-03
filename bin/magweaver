@@ -4,6 +4,7 @@
 import os, subprocess, shutil, logging, sys
 import pandas as pd
 from Bio import SeqIO
+import src
 import src.utilities as utils
 import src.file_handling as filehandling
 from src.argument_handling import parse_args, Shuttler

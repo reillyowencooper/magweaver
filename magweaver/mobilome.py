@@ -8,11 +8,12 @@ class MagMobilome(object):
     This problem was recently highlighted in https://msphere.asm.org/content/5/6/e00854-20#ref-8,
     which suggests that eukaryotic sequences are an urgent problem for most MAGs. This uses
     TREP via MMSeqs2 to search for contigs with these elements.'''
-    def __init__(self, mag, outdir, tmp_dir):
+    def __init__(self, mag, outdir, tmp_dir, score=100):
         self.mag = mag
         self.outdir = outdir
         self.mag_name = os.path.splitext(os.path.basename(mag))[0]
         self.tmp_dir = tmp_dir
+        self.score = score
         
     def create_mag_db(self):
         createdb_cmd = ['mmseqs', 'createdb', self.mag, os.path.join(self.tmp_dir, mag_name + "_db")]
@@ -43,6 +44,19 @@ class MagMobilome(object):
                                                                'bit_score': 'Bit Score'})
         return output_df
     
+    def identify_erroneous_contigs(self, trep_df):
+        err_df = trep_df[trep_df['Contig Name'] >= self.score]
+        return err_df
     
+    def write_err_df(self, err_df, output_file):
+        '''Writes DataFrames to file.'''
+        err_df.to_csv(output_file, index = False, header = True)
+        
+    def run(self):
+        outfile_loc = os.path.join(self.outdir, self.mag_name + "_err_euk.csv")
+        
+        
     
+        
+        
     
