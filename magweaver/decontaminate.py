@@ -1,13 +1,13 @@
 import os
 from collections import defaultdict, Counter
-from magweaver import genome
+from magweaver.genome import Mag
 
 BASEPATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP_DIR = os.path.join(BASEPATH, "tmp")
 OUT_DIR = os.path.join(BASEPATH + "results")
 
-def create_mag(mag_fasta, forward_reads, reverse_reads, tmp_dir = TMP_DIR):
-    mag = genome.Mag(mag_fasta, forward_reads, reverse_reads, tmp_dir)
+def create_mag(mag_fasta, forward_reads, reverse_reads, num_threads, tmp_dir = TMP_DIR):
+    mag = Mag(mag_fasta, forward_reads, reverse_reads, num_threads, tmp_dir)
     mag.craft_mag()
     mag.craft_summary_dict()
     return mag
@@ -22,7 +22,9 @@ def flag_erroneous_contigs(mag, minimum_suspicion):
     return highly_suspect_contigs           
 
 def filter_mag(mag, highly_suspect_contigs):
-    filtered_mag = {contig: seqcontents for contig, seqcontents in mag.mag_contigs.items() if contig not in highly_suspect_contigs}
+    filtered_mag = mag
+    for suscontig in highly_suspect_contigs:
+        filtered_mag.pop(suscontig)
     return filtered_mag
 
 def write_fasta(filtered_mag, outfile):
@@ -36,8 +38,8 @@ def write_fasta(filtered_mag, outfile):
 # ------ Feeder functions for flag_erroneous_contigs ------   
 def flag_gc(mag):
     erroneous_contigs = []
-    min_gc = mag.summary_dict["gc_mean"] - mag.summary_dict["gc_std"]
-    max_gc = mag.summary_dict["gc_mean"] - mag.summary_dict["gc_std"]
+    min_gc = mag.summary_dict["gc_mean"] - (2 * mag.summary_dict["gc_std"])
+    max_gc = mag.summary_dict["gc_mean"] + (2 * mag.summary_dict["gc_std"])
     for contig, seqcontents in mag.mag_contigs.items():
         gc = seqcontents["gc"]
         if (gc > max_gc) or (gc < min_gc):
@@ -46,8 +48,8 @@ def flag_gc(mag):
 
 def flag_cov(mag):
     erroneous_contigs = []
-    min_cov = mag.summary_dict["cov_mean"] - mag.summary_dict["cov_std"]
-    max_cov = mag.summary_dict["cov_mean"] + mag.summary_dict["cov_std"]
+    min_cov = mag.summary_dict["cov_mean"] - (2 * mag.summary_dict["cov_std"])
+    max_cov = mag.summary_dict["cov_mean"] + (2 * mag.summary_dict["cov_std"])
     for contig, seqcontents in mag.mag_contigs.items():
         cov = seqcontents["cov"]
         if (cov > max_cov) or (cov < min_cov):
@@ -56,8 +58,8 @@ def flag_cov(mag):
 
 def flag_tetra(mag):
     erroneous_contigs = []
-    min_comp = mag.summary_dict["pca_mean"] - mag.summary_dict["pca_std"]
-    max_comp = mag.summary_dict["pca_mean"] + mag.summary_dict["pca_std"]
+    min_comp = mag.summary_dict["pca_mean"] - (2 * mag.summary_dict["pca_std"])
+    max_comp = mag.summary_dict["pca_mean"] + (2 * mag.summary_dict["pca_std"])
     for contig, seqcontents in mag.mag_contigs.items():
         comp = seqcontents["pca"]
         if (comp > min_comp) or (comp < max_comp):
@@ -88,26 +90,27 @@ def flag_scg_duplicates(mag):
 
 def flag_scg_empty(mag):
     no_hits = []
-    scg_dict = defaultdict(int)
     for contig, seqcontents in mag.mag_contigs.items():
         if not seqcontents["scg"]:
             no_hits.append(contig)
     return no_hits
-    
+
 def flag_mobilome(mag):
     erroneous_contigs = []
     for contig, seqcontents in mag.mag_contigs.items():
-        if seqcontents["mob"]:
+        if not "mob" in seqcontents:
+            pass
+        else:
             erroneous_contigs.append(contig)
     return erroneous_contigs        
 
 # ------ IT'S TIME FOR THE DECONTAMINATOR ------
 
-def decontaminator(mag_fasta, forward_reads, reverse_reads, minimum_suspicion, outfile, tmp_dir = TMP_DIR):
+def decontaminator(mag_fasta, forward_reads, reverse_reads, num_threads, minimum_suspicion, outfile, tmp_dir = TMP_DIR):
     if not os.path.exists(OUT_DIR):
         os.mkdir(OUT_DIR)
     outloc = os.path.join(OUT_DIR, outfile)
-    mag = create_mag(mag_fasta, forward_reads, reverse_reads, tmp_dir)
+    mag = create_mag(mag_fasta, forward_reads, reverse_reads, num_threads, tmp_dir)
     suspect_contigs = flag_erroneous_contigs(mag, minimum_suspicion)
     filtered_mag = filter_mag(mag, suspect_contigs)
     write_fasta(filtered_mag, outloc)

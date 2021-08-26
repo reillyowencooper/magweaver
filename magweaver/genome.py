@@ -13,8 +13,8 @@ from sklearn import decomposition
 
 BASEPATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCG_DB = os.path.join(BASEPATH, "data/essential.hmm.gz")
-TAX_DB = os.path.join(BASEPATH, "data/swissprot")
-TREP_DB = os.path.join(BASEPATH, "data/trep")
+TAX_DB = os.path.join(BASEPATH, "data/swissprot/swissprot")
+TREP_DB = os.path.join(BASEPATH, "data/trep/trep")
 
 class Contig(object):
     '''Defines a contig, evaluates contig-wise metrics assuming input is a BioPython SeqRecord'''
@@ -23,6 +23,18 @@ class Contig(object):
         self.contig_dict = self.create_contig_dict()
         
     def create_contig_dict(self):
+        """Creates a dictionary of contig: contig_contents
+
+        Returns:
+            dict: A dictionary with contig name as the key and a
+            nested dictionary as the values. In the nested dictionary, we have
+            - seq: contig DNA sequence
+            - len: contig length in basepairs
+            - revcomp: reverse complement of DNA sequence
+            - gc: contig GC %
+            - tetra: {tetranucleotide (e.g., ATGC): number of instances}
+            - tetra_proportion: {tetranucleotide: proportion to total tetramers}
+        """
         contig_dict = defaultdict()
         seq_id = self.contig.id
         seq = self.contig.seq
@@ -42,6 +54,14 @@ class Contig(object):
     # --------- Tetranucleotide frequencies in a sequence --------       
     
     def count_tetramers(self, seq):
+        """Counts tetranucleotide frequences in a DNA sequence
+
+        Args:
+            seq (Bio.Seq DNA string): Contig DNA sequence
+
+        Returns:
+            dict: {tetranucleotide (e.g., AGCT): number of occurrences}
+        """
         sequence_str = str(seq)
         tetramers = {}
         for i in range(len(sequence_str) - 3):
@@ -53,26 +73,44 @@ class Contig(object):
         return tetramers
     
     def tetramer_proportion(self, tetramer_dict):
+        """Counts proportion of tetranucleotide as compared to total count
+
+        Args:
+            tetramer_dict (dict): {tetranucleotide (e.g., AGCT): number of occurrences}
+
+        Returns:
+            dict: {tetranucleotide (e.g., AGCT): number of occurrences/total occurrences}
+        """
         total_tetra = float(sum(tetramer_dict.values()))
-        tetramer_prop = tetramer_dict
-        for tetra in tetramer_prop.keys():
-            tetramer_prop[tetra] = float(tetramer_prop[tetra])/total_tetra
-        return total_tetra
+        tetramer_prop = {}
+        for tetra, num_occ in tetramer_dict.items():
+            if num_occ == 0:
+                tetramer_prop[tetra] = 0
+            else:
+                tetramer_prop[tetra] = float(num_occ)/total_tetra
+        return tetramer_prop
       
         
 class Mag(object):
-    '''Defines a metagenome-assembled genome, evaluates for useful metrics'''
-    def __init__(self, mag_fasta_loc, mg_forward_reads_loc, mg_reverse_reads_loc, tmp_dir):
+    '''Defines a metagenome-assembled genome, evaluates contigs and entire MAG for useful metrics'''
+    def __init__(self, mag_fasta_loc, mg_forward_reads_loc, mg_reverse_reads_loc, num_threads, tmp_dir):
         self.mag_name = os.path.basename(mag_fasta_loc)
-        self.mag = self.create_seq_dict(mag_fasta_loc)
+        self.mag = mag_fasta_loc
         self.freads = mg_forward_reads_loc
         self.rreads = mg_reverse_reads_loc
+        self.num_threads = num_threads
         self.tmp_dir = tmp_dir
         
     # ~~~~~~~~~~~ Create initial sequence dictionary ~~~~~~~~~~~~~~ 
-    
     def create_seq_dict(self, fasta):
-        '''Sets up sequence dictionary for all contigs in '''
+        """[summary]
+
+        Args:
+            fasta ([type]): [description]
+
+        Returns:
+            [type]: [description]
+        """
         complete_contig_dict = defaultdict()
         for seqrecord in SeqIO.parse(fasta, "fasta"):
             contig = Contig(seqrecord)
@@ -81,25 +119,33 @@ class Mag(object):
         return complete_contig_dict
     
     # ~~~~~~~~~~~~ Contig statistics performed MAG-wide ~~~~~~~~~~~~~~
-    
     def craft_mag(self):
+        print('Creating base contig dictionary')
         mag = self.create_seq_dict(self.mag)
+        print('Indexing MAG')
         self.index_mag()
+        print('Mapping reads to MAG')
         self.map_reads()
+        print('Calculating contig coverage')
         mag = self.count_coverage(mag)
+        print('Checking for core genes')
         self.predict_cds()
         self.run_hmmsearch()
         mag = self.create_scg_dict(mag)
+        print('Finding taxonomy')
         self.create_mag_db()
         self.run_taxonomy()
         mag = self.create_tax_dict(mag)
+        print('Checking for mobile elements')
         self.search_trep()
         mag = self.create_mobilome_dict(mag)
+        print('Calculating tetranucleotide frequency')
         mag = self.create_pca_dict(mag)
+        print('Setting final contigs')
         self.mag_contigs = mag
-
-    # --------- Read coverage --------      
-    
+        
+    # --------- Read coverage --------
+     
     def index_mag(self):
         self.index_loc = os.path.join(self.tmp_dir, self.mag_name)
         if not os.path.exists(self.index_loc):
@@ -109,7 +155,7 @@ class Mag(object):
         
     def map_reads(self):
         self.bam = os.path.join(self.tmp_dir, self.mag_name + ".bam")
-        map_cmd = "bwa mem" + self.index_loc + " " + self.freads + " " + self.rreads + " | samtools sort -o " + self.bam + " -"
+        map_cmd = "bwa mem -t " + str(self.num_threads) + " " + self.index_loc + " " + self.freads + " " + self.rreads + " | samtools sort -o " + self.bam + " -"
         if not os.path.exists(self.bam):
             subprocess.call(map_cmd, shell = True) # Only way I could figure out how to implement with the pipe to samtools
     
@@ -126,8 +172,8 @@ class Mag(object):
                     seqcontents["cov"] = cov
         
         return contig_dict
-
-    # --------- Single copy genes --------      
+    
+    # --------- Single copy genes --------
     
     def predict_cds(self):
         self.cds = os.path.join(self.tmp_dir, self.mag_name + ".faa")
@@ -180,11 +226,15 @@ class Mag(object):
             for contig, hmm in scg_dict.items():
                 if seqid == contig:
                     seqcontent["scg"] = hmm
+                    
+        for seqcontent in contig_dict.values():
+            if not "scg" in seqcontent:
+                seqcontent["scg"] = {}
         
         return contig_dict
-            
-    # --------- Taxonomy --------      
-            
+    
+    # --------- Taxonomy --------
+    
     def create_mag_db(self):
         self.db = os.path.join(self.tmp_dir, self.mag_name + "_db")
         create_db_cmd = ["mmseqs", "createdb", self.cds, self.db]
@@ -240,18 +290,27 @@ class Mag(object):
             for contig, taxonomy in contig_taxonomy.items():
                 if seqid == contig:
                     seqcontents["tax"] = taxonomy
+                    
+        for seqcontents in contig_dict.values():
+            if not "tax" in seqcontents:
+                seqcontents["tax"] = {"phylum": "Unknown",
+                                      "class": "Unknown",
+                                      "order": "Unknown",
+                                      "family": "Unknown",
+                                      "genus": "Unknown",
+                                      "species": "Unknown"}
         
         return contig_dict
                                
     def count_tax_hits(self, tax_list):
-        contig_tax = Counter(tax_list).most_common(1)[0][0]
-        if contig_tax is None:
+        if not tax_list:
             return "Unknown"
         else:
+            contig_tax = Counter(tax_list).most_common(1)[0][0]
             return contig_tax
-            
-    # --------- Mobilome --------      
-                
+        
+    # --------- Mobilome --------
+    
     def search_trep(self):
         self.trep = os.path.join(self.tmp_dir, self.mag_name + "_trepdb")
         self.trep_tsv = os.path.join(self.tmp_dir, self.mag_name + "_trep.tsv")
@@ -270,40 +329,48 @@ class Mag(object):
     
     def create_mobilome_dict(self, contig_dict):
         trep_res = self.parse_mmseqs_search(self.trep_tsv)
-        mobilome_dict = defaultdict(dict)
-        for hit in trep_res:
-            contig = hit[0].split("_")[0]
-            trep = hit[1]
-            e_value = hit[11]
-            bitscore = float(hit[12])
-            start_pos = int(hit[7])
-            end_pos = int(hit[8])
-            hit_len = abs(start_pos - end_pos)
-            mobilome_dict[contig][trep] = {"e_val": e_value,
-                                         "bitscore": bitscore,
-                                         "start_pos": start_pos,
-                                         "end_pos": end_pos,
-                                         "hit_len": hit_len}
-        
-        for seqid, seqcontent in contig_dict.items():
-            for contig, trep in mobilome_dict.items():
-                if seqid == contig:
-                    seqcontent['mob'] = trep
+        if not trep_res:
+            for seqid, seqcontent in contig_dict.items():
+                seqcontent["mob"] = {}
+        else:
+            mobilome_dict = defaultdict(dict)
+            for hit in trep_res:
+                contig = hit[0].split("_")[0]
+                trep = hit[1]
+                e_value = hit[10]
+                bitscore = float(hit[11])
+                start_pos = int(hit[7])
+                end_pos = int(hit[8])
+                hit_len = abs(start_pos - end_pos)
+                mobilome_dict[contig][trep] = {"e_val": e_value,
+                                            "bitscore": bitscore,
+                                            "start_pos": start_pos,
+                                            "end_pos": end_pos,
+                                            "hit_len": hit_len}
+            
+            for seqid, seqcontent in contig_dict.items():
+                for contig, trep in mobilome_dict.items():
+                    if seqid == contig:
+                        seqcontent['mob'] = trep
                     
         return contig_dict
-
-    # --------- PCA --------      
     
-    def create_pca_dict(self, contig_dict):
+    # --------- PCA --------
+    
+    def create_pca_dict(self, contig_dict): ###### SOMETHING IS GOING WRONG HERE
         pca = decomposition.PCA(n_components = 1)
-        tetramers = []
-        for seqcontents in contig_dict.values():
-            tetramer_list = seqcontents["tetra_proportion"]
-            tetramers.append(tetramer_list)
-        tetramer_df = pd.concat(tetramers)
-        pca.fit(tetramer_df)
+        tetramer_df_list = []
+        for contig, seqcontents in contig_dict.items():
+            tetra_dict = seqcontents["tetra_proportion"]
+            tetra_df = pd.DataFrame(tetra_dict, index = [0])
+            tetra_df['Contig'] = contig
+            tetramer_df_list.append(tetra_df)
+        tetramer_df = pd.concat(tetramer_df_list)
+        tetramer_df = tetramer_df.fillna(value = 0)
+        tetramer_df_no_names = tetramer_df.drop(columns = ['Contig']).transpose()
+        pca.fit(tetramer_df_no_names)
         first_axis = pca.components_[0]
-        contig_names = list(contig_dict.keys())
+        contig_names = tetramer_df['Contig'].tolist()
         pca_dict = dict(zip(contig_names, first_axis))
         
         for seqid, seqcontents in contig_dict.items():
@@ -312,25 +379,25 @@ class Mag(object):
                     seqcontents["pca"] = pc
                     
         return contig_dict
-
+    
     # ~~~~~~~~~~~ Run MAG-wide MAG statistics ~~~~~~~~~~~~
     
-    def craft_summary_dict(self, contig_dict):
-        summary_dict = defaultdict()
-        summary_dict["total_length"] = sum(x["len"] for x in contig_dict.values())
-        gc = self.find_mean_std(contig_dict, "gc")
+    def craft_summary_dict(self):
+        summary_dict = {}
+        summary_dict["total_length"] = sum(int(x["len"]) for x in self.mag_contigs.values())
+        gc = self.find_mean_std(self.mag_contigs, "gc")
         summary_dict["gc_mean"] = gc[0]
         summary_dict["gc_std"] = gc[1]
-        cov = self.find_mean_std(contig_dict, "cov")
+        cov = self.find_mean_std(self.mag_contigs, "cov")
         summary_dict["cov_mean"] = cov[0]
         summary_dict["cov_std"] = cov[1]
-        pc = self.find_mean_std(contig_dict, "pca")
+        pc = self.find_mean_std(self.mag_contigs, "pca")
         summary_dict["pca_mean"] = pc[0]
         summary_dict["pca_std"] = pc[1]
-        comp_red = self.find_completeness_redundancy(contig_dict)
+        comp_red = self.find_completeness_redundancy(self.mag_contigs)
         summary_dict["completeness"] = comp_red[0]
         summary_dict["redundancy"] = comp_red[1]
-        tax = self.find_consensus_taxonomy(contig_dict)
+        tax = self.find_consensus_taxonomy_phylum(self.mag_contigs)
         summary_dict["phylum"] = tax[0]
         summary_dict["class"] = tax[1]
         
@@ -354,12 +421,15 @@ class Mag(object):
         total_scgs = 111
         scg_dict = {}
         for seqcontents in contig_dict.values():
-            contig_scg_dict = seqcontents["scg"]
-            for hmm in contig_scg_dict.keys():
-                if hmm not in scg_dict.keys():
-                    scg_dict[hmm] = 1
-                else:
-                    scg_dict[hmm] += 1
+            if not seqcontents["scg"]:
+                pass
+            else:
+                contig_scg_dict = seqcontents["scg"]
+                for hmm in contig_scg_dict.keys():
+                    if hmm not in scg_dict.keys():
+                        scg_dict[hmm] = 1
+                    else:
+                        scg_dict[hmm] += 1
                             
         duplicate_hits = {hmm: hits for hmm, hits in scg_dict.items() if hits > 1}
         
@@ -375,6 +445,8 @@ class Mag(object):
         for seqcontents in contig_dict.values():
             phylum_dict[seqcontents["tax"]["phylum"]] += 1
             class_dict[seqcontents["tax"]["class"]] += 1
+        phylum_dict.pop("Unknown")
+        class_dict.pop("Unknown")
         most_common_phylum = max(phylum_dict, key = phylum_dict.get)
         most_common_class = max(class_dict, key = class_dict.get)
         return most_common_phylum, most_common_class
