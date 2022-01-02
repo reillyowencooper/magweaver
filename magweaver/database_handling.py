@@ -3,6 +3,8 @@ from Bio import SeqIO
 import src.file_handling as filehandling
 import src.utilities as utils
 
+## TODO: COMPLETELY REVAMP DATABASE HANDLING
+
 class DataBaseHandler(object):
     
     def __init__(self):
