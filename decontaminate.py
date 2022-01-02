@@ -2,7 +2,8 @@ import os
 from collections import defaultdict, Counter
 from magweaver.genome import Mag
 
-BASEPATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# TODO: Remove all within file calls to hard paths, move to magweaver.py
+BASEPATH = os.path.dirname(os.path.abspath(__file__))
 TMP_DIR = os.path.join(BASEPATH, "tmp")
 OUT_DIR = os.path.join(BASEPATH, "results")
 
