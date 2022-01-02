@@ -1,14 +1,13 @@
 import os, subprocess, shutil
 import pandas as pd
 from collections import Counter
-import src.utilities as utils
+import magweaver.utilities as utils
     
 
 class MagTaxonomy(object):
     '''Taxonomically classifies individual contigs within a MAG.
     ORFs within a MAG are individually searched against the SwissProt database using MMseqs2.
     The most common Phylum-level classification for all identified ORFs is used as the contig classification.
-    NOTE: Probably should do this as a weighted mean based on the # of ORFs in a contig, since some are larger.
     
     This uses Phylum-level classification because many high-quality MAGs tend to have a misplaced phylum-level cluster,
     as per Chen et al. 2020
