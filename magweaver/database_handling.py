@@ -1,6 +1,14 @@
 import os
 import subprocess
 
+INPUT_DATABASES = ("taxonomy", "scg", "trep")
+
+class Databases:
+    def __init__(self, configfile):
+        self.configfile = configfile
+        
+# TODO: Convert functions back into a class that can read in locations from CONFIG or set paths automatically based on below functions
+ 
 def get_taxdb(data_dir, taxdb_dir, tmp_dir):
     "Get MMSeqs prebuilt SwissProt database for taxonomy and index"
     taxdb_loc = os.path.join(data_dir, taxdb_dir)

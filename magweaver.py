@@ -33,4 +33,5 @@ def decontam(mag, fwd, rev, threads, sus, out, tmp):
 
 
 if __name__ == '__main__':
+    preparedb()
     decontam()
