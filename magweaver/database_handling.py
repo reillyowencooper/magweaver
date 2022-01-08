@@ -7,6 +7,13 @@ class Databases:
     def __init__(self, configfile):
         self.configfile = configfile
         
+    def check_exists(self, filepath):
+        "Checks if a path exists, returning path or error"
+        if os.path.isfile(filepath):
+            return os.path.realpath(filepath)
+        else:
+            raise ValueError(f"{filepath} does not exist")
+            
 # TODO: Convert functions back into a class that can read in locations from CONFIG or set paths automatically based on below functions
  
 def get_taxdb(data_dir, taxdb_dir, tmp_dir):
